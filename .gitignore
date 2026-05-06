@@ -21,7 +21,7 @@ training_data/
 
 # --- Model Weights ---
 # Keep your best weights, but ignore the rest
-*.pth
+.pth
 # Un-comment the next line if you want to manually commit your best ONNX file
 # !subtractor.onnx 
 
