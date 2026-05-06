@@ -1,0 +1,37 @@
+# --- Byte-compiled / optimized / DLL files ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Virtual Environments ---
+.venv/
+venv/
+ENV/
+env/
+
+# --- Audio Data (The Heavy Stuff) ---
+# Do not sync your training datasets
+raw_data/
+paired_room_data/
+test_results/
+test_results_spec/
+test_results_spec_more/
+paired_room_data/
+training_data/
+
+# --- Model Weights ---
+# Keep your best weights, but ignore the rest
+*.pth
+# Un-comment the next line if you want to manually commit your best ONNX file
+# !subtractor.onnx 
+
+# --- IDE & OS Files ---
+.DS_Store
+.vscode/
+.idea/
+.screenrc
+.continue
+
+# --- Logs & Checkpoints ---
+*.log
+checkpoint/
