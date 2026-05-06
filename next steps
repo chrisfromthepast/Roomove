@@ -1,0 +1,43 @@
+# Project Armor: Architecture State File
+**Primary Objective:** Defeat a 4.9ms NUC/Focusrite sidecar rig by running a native AAX DSP/Native neural dereverberation plugin on an Avid VENUE S6L.
+
+## 1. The Neural Model (Python -> ONNX)
+* **Architecture:** 2D Spectrogram "Skip-U-Net" (Encoder/Decoder with Skip Connections to preserve high-frequency vocal transients).
+* **Audio Specs:** 48kHz Sample Rate.
+* **DSP Specs:** `N_FFT` = 2048, `HOP_LENGTH` = 512, utilizing a Hann Window to prevent spectral leakage.
+* **Data Prep:** Power-law compression (0.3) applied to magnitude to force model attention on quiet reverb tails.
+* **Export Format:** `.onnx` (Opset 12, dynamic time axis, constant folding enabled).
+
+## 2. The C++ Environment (JUCE)
+* **Build System:** CMake (essential for CI/CD pipelines and external library linking).
+* **Inference Engine:** RTNeural.
+    * *Why:* It is a lightweight, header-only C++ library. It avoids the massive overhead, latency, and system dependency issues of full ONNX Runtime or PyTorch C++ APIs.
+* **Weights:** The `subtractor.onnx` file is embedded directly into the plugin binary using `juce_add_binary_data`.
+
+## 3. The Threading Architecture (Zero Latency Design)
+To beat the 4.9ms limit, we use **Asynchronous Late-Masking**. The plugin does *not* wait for the neural network to process the current block.
+
+* **The Audio Thread (0 Math Latency):**
+    * Reads the incoming audio sample.
+    * Pulls the *most recently available* Gain Mask from the FIFO.
+    * Multiplies the audio by the mask.
+    * Outputs the audio.
+* **The Background Thread (The Brain):**
+    * Collects a 512-sample chunk.
+    * Runs the FFT (`juce::dsp::FFT`).
+    * Executes the RTNeural inference on the magnitude.
+    * Pushes the resulting mask array to the Audio Thread via a `juce::AbstractFifo` (Lock-Free Ring Buffer).
+* **The Acoustic Advantage:** The ~10ms mask delay means initial vocal transients ("K", "T" sounds) pass through completely un-muffled. The neural gate clamps down precisely as the capsule's resonant room tail begins to ring.
+
+## 4. VENUE RTX OS Constraints (Qualification Rules)
+To survive the Avid live-sound environment and not crash the real-time OS watchdogs:
+* **Zero Dynamic Allocation:** Absolutely no `new` or `malloc` calls inside the audio processing loop.
+* **Pre-Allocation:** Every single buffer, vector, and RTNeural tensor is allocated exactly once during the `prepareToPlay` initialization phase.
+* **Thread Safety:** Strict adherence to lock-free programming between the audio and background threads. No mutexes or thread blocking.
+
+## 5. UI and UX Logic
+* **The "Armor Strength" Slider:** * Does *not* dry/wet crossfade the audio (which causes phase cancellation).
+    * Instead, it interpolates the Neural Mask itself.
+    * At 0%: Mask is forced to 1.0 (pass-through).
+    * At 100%: Mask uses raw RTNeural output.
+    * At Target (e.g., 10%): `FinalMask = (ModelOutput * 0.1) + (1.0 * 0.9)`.
