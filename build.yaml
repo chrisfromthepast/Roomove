@@ -1,0 +1,27 @@
+name: Build Project Armor (AAX)
+on: [push]
+
+jobs:
+  build-windows:
+    runs-on: self-hosted # Targets your local "old computer" runner
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Configure CMake
+        # Use -DAAX_SDK_PATH to point to your pre-built library
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 `
+          -DAAX_SDK_PATH="${{ env.AAX_SDK_PATH }}" `
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Plugin
+        run: cmake --build build --config Release --target ProjectArmor_AAX
+
+      - name: Upload Artifact
+        uses: actions/artifacts@v4
+        with:
+          name: Armor-AAX-Binary
+          path: build/ProjectArmor_artefacts/Release/AAX/ProjectArmor.aaxplugin
