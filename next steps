@@ -1,36 +1,39 @@
 # Project Armor: Architecture State File
-**Primary Objective:** Defeat a 4.9ms NUC/Focusrite sidecar rig by running a native AAX DSP/Native neural dereverberation plugin on an Avid VENUE S6L.
 
-## 1. The Neural Model (Python -> ONNX)
+## The Grand Vision: Hardware Kit
+**The Endgame:** A standalone hardware unit featuring a 4-channel ADC, a DSP, a hypervisor running a TinyML model, and a DAC.
+**The Current Phase (Phase 1):** A JUCE-based AAX plugin acting as a Proof of Concept (POC). This software phase validates the neural network math, the latency strategy, and the UX before moving to bare-metal hardware. The target for this POC is beating a 4.9ms NUC/Focusrite rig natively on an Avid VENUE S6L.
+
+## 1. The Neural Model (Python -> ONNX -> TinyML)
 * **Architecture:** 2D Spectrogram "Skip-U-Net" (Encoder/Decoder with Skip Connections to preserve high-frequency vocal transients).
 * **Audio Specs:** 48kHz Sample Rate.
 * **DSP Specs:** `N_FFT` = 2048, `HOP_LENGTH` = 512, utilizing a Hann Window to prevent spectral leakage.
 * **Data Prep:** Power-law compression (0.3) applied to magnitude to force model attention on quiet reverb tails.
-* **Export Format:** `.onnx` (Opset 12, dynamic time axis, constant folding enabled).
+* **Export Format:** `.onnx` (Opset 12, dynamic time axis, constant folding enabled). This format bridges the gap between our Python training and the C++ POC, eventually scaling down for the hardware hypervisor.
 
-## 2. The C++ Environment (JUCE)
+## 2. The POC Software Environment (JUCE)
 * **Build System:** CMake (essential for CI/CD pipelines and external library linking).
 * **Inference Engine:** RTNeural.
-    * *Why:* It is a lightweight, header-only C++ library. It avoids the massive overhead, latency, and system dependency issues of full ONNX Runtime or PyTorch C++ APIs.
+    * *Why:* It is a lightweight, header-only C++ library. It mimics the low-overhead footprint we will eventually need for the hardware's TinyML implementation.
 * **Weights:** The `subtractor.onnx` file is embedded directly into the plugin binary using `juce_add_binary_data`.
 
 ## 3. The Threading Architecture (Zero Latency Design)
-To beat the 4.9ms limit, we use **Asynchronous Late-Masking**. The plugin does *not* wait for the neural network to process the current block.
+To beat the 4.9ms limit in software (and prep for hardware DSP), we use **Asynchronous Late-Masking**. The audio path never waits for the neural network.
 
 * **The Audio Thread (0 Math Latency):**
     * Reads the incoming audio sample.
     * Pulls the *most recently available* Gain Mask from the FIFO.
     * Multiplies the audio by the mask.
     * Outputs the audio.
-* **The Background Thread (The Brain):**
+* **The Background Thread / Hypervisor Simulation (The Brain):**
     * Collects a 512-sample chunk.
     * Runs the FFT (`juce::dsp::FFT`).
     * Executes the RTNeural inference on the magnitude.
     * Pushes the resulting mask array to the Audio Thread via a `juce::AbstractFifo` (Lock-Free Ring Buffer).
 * **The Acoustic Advantage:** The ~10ms mask delay means initial vocal transients ("K", "T" sounds) pass through completely un-muffled. The neural gate clamps down precisely as the capsule's resonant room tail begins to ring.
 
-## 4. VENUE RTX OS Constraints (Qualification Rules)
-To survive the Avid live-sound environment and not crash the real-time OS watchdogs:
+## 4. Hardware-Ready Constraints (VENUE RTX & Bare Metal)
+To survive the Avid live-sound environment now, and prepare for DSP firmware later:
 * **Zero Dynamic Allocation:** Absolutely no `new` or `malloc` calls inside the audio processing loop.
 * **Pre-Allocation:** Every single buffer, vector, and RTNeural tensor is allocated exactly once during the `prepareToPlay` initialization phase.
 * **Thread Safety:** Strict adherence to lock-free programming between the audio and background threads. No mutexes or thread blocking.
