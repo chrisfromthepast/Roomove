@@ -1,0 +1,33 @@
+name: Build and Deploy Locally
+on: [push]
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted # Your local Windows runner
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 `
+          -DAAX_SDK_PATH="$C/SDKs/aax-sdk-2-9-0" `
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build AAX Binary
+        run: cmake --build build --config Release --target ProjectArmor_AAX
+
+      - name: Deploy to Local Plug-Ins Folder
+        shell: pwsh
+        run: |
+          $Source = "build/Roomove_artefacts/Release/AAX/ProjectArmor.aaxplugin"
+          $Dest = "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\Roomove.aaxplugin"
+          
+          # Clean up old version if it exists
+          if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
+          
+          # Copy the new build
+          Copy-Item -Path $Source -Destination $Dest -Recurse -Force
+          Write-Host "Roomove deployed to local Plug-Ins folder."
