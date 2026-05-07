@@ -5,17 +5,17 @@ RoomoveAudioEditor::RoomoveAudioEditor (RoomoveAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
     // -- Intensity Knob --
-    armorStrengthKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    armorStrengthKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
-    addAndMakeVisible(armorStrengthKnob);
+    intensityKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    intensityKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    addAndMakeVisible(intensityKnob);
 
     strengthLabel.setText("Intensity", juce::dontSendNotification);
     strengthLabel.setJustificationType(juce::Justification::centred);
-    strengthLabel.attachToComponent(&armorStrengthKnob, false);
+    strengthLabel.attachToComponent(&intensityKnob, false);
     addAndMakeVisible(strengthLabel);
 
     // Uncomment and connect to your APVTS once created in the Processor
-    // strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "ROOMOVE_STRENGTH", armorStrengthKnob);
+    // strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "ROOMOVE_STRENGTH", intensityKnob);
 
     // -- VU Meter --
     addAndMakeVisible(vuMeter);
@@ -62,7 +62,7 @@ void RoomoveAudioEditor::resized()
     auto topArea = area.removeFromTop(area.getHeight() / 2);
     
     // Knob on left
-    armorStrengthKnob.setBounds(topArea.removeFromLeft(topArea.getWidth() / 2).reduced(10, 30));
+    intensityKnob.setBounds(topArea.removeFromLeft(topArea.getWidth() / 2).reduced(10, 30));
     
     // VU Meter on right
     auto vuArea = topArea.reduced(20, 30);
