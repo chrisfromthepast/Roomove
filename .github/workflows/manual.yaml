@@ -55,27 +55,38 @@ jobs:
         if: env.DSP_ENABLED == 'true'
         shell: powershell
         run: |
-          # FIX: Added _AAX to the path to match JUCE 8 output
-          $Bundle_Res = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin/Contents/Resources/"
-          
+          # The exact path JUCE 8 uses for AAX artifacts
+          $Artifacts_Root = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin"
+          $Bundle_Res = "$Artifacts_Root/Contents/Resources/"
+          $Win64_Bin = "$Artifacts_Root/Contents/Win64/Roomove.aaxplugin"
+
+          # CRITICAL CHECK: Does the Native binary actually exist?
+          if (!(Test-Path $Win64_Bin)) {
+              Write-Error "CRITICAL FAILURE: Native Win64 binary not found at $Win64_Bin. Pro Tools will not see the plugin!"
+              exit 1
+          }
+
           if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res }
           
+          # Inject DSP and XML
           Copy-Item -Path "build_dsp/libRoomove_DSP.a" -Destination "${Bundle_Res}Roomove_DSP.a" -Force
           Copy-Item -Path "Resources/Roomove_PageTable.xml" -Destination $Bundle_Res -Force
-          Write-Host "Injected into: $Bundle_Res"
+          Write-Host "Injection successful into $Artifacts_Root"
 
       - name: Deploy to Local Plug-Ins Folder
         shell: powershell
         run: |
-          # FIX: Added _AAX to the source path
           $Source = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin"
           $Dest = "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\Roomove.aaxplugin"
           
           if (Test-Path $Source) {
-              if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
-              Copy-Item -Path $Source -Destination $Dest -Recurse -Force
-              Write-Host "Deployment Successful from $Source"
+              # Remove old version to prevent "File in Use" or ghosting issues
+              if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest -ErrorAction SilentlyContinue }
+              
+              # Copy the entire bundle
+              Copy-Item -Path $Source -Destination "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\" -Recurse -Force
+              Write-Host "Deployed to Pro Tools folder: $Dest"
           } else {
-              Write-Error "SOURCE NOT FOUND: $Source. Check build_native folder structure!"
+              Write-Error "Deployment failed: Source folder $Source does not exist."
               exit 1
           }
