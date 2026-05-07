@@ -13,7 +13,7 @@ jobs:
       - name: Configure CMake
         run: |
           cmake -B build -G "Visual Studio 17 2022" -A x64 `
-          -DAAX_SDK_PATH="C/SDKs/aax-sdk-2-9-0" `
+          -DAAX_SDK_PATH="C:/SDKs/aax-sdk-2-9-0" `
           -DCMAKE_BUILD_TYPE=Release
 
       - name: Build AAX Binary
