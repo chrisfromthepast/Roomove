@@ -47,6 +47,7 @@ private:
     juce::AbstractFifo fifo { 1024 };
     float maskBuffer[1024];
     float currentMask = 1.0f;
+    std::atomic<float>* armorStrengthValue = nullptr;
 
     void runInference();
     juce::AudioBuffer<float> sidechainBuffer;

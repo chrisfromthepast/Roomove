@@ -13,6 +13,7 @@ ArmorAudioProcessor::ArmorAudioProcessor()
         .withOutput ("Output", juce::AudioChannelSet::mono(), true)),
       apvts (*this, nullptr, "Parameters", createParameterLayout())
 {
+    armorStrengthValue = apvts.getRawParameterValue (armorStrengthParameterId);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ArmorAudioProcessor::createParameterLayout()
@@ -48,8 +49,7 @@ void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
 void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
-    const auto* armorStrengthParameter = apvts.getRawParameterValue (armorStrengthParameterId);
-    const auto armorStrength = armorStrengthParameter != nullptr ? armorStrengthParameter->load() : 1.0f;
+    const auto armorStrength = armorStrengthValue != nullptr ? armorStrengthValue->load() : 1.0f;
     auto* channelData = buffer.getWritePointer(0);
 
     for (int i = 0; i < buffer.getNumSamples(); ++i)
@@ -64,6 +64,7 @@ void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
         }
 
         // 2. Apply Mask (Zero Latency path - safe for both Native and DSP)
+        // 0.0 bypasses the mask and 1.0 applies the full current mask value.
         const auto blendedMask = 1.0f + ((currentMask - 1.0f) * armorStrength);
         channelData[i] *= blendedMask;
     }
