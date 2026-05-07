@@ -5,7 +5,8 @@ project(Roomove VERSION 0.1.0)
 # --- JUCE TRIPLE-CHECK LOGIC ---
 
 # 1. CHECK FOR "BAKED" INSTALL (Fastest - seconds)
-find_package(JUCE CONFIG QUIET PATHS "C:/JUCE_Installed")
+# 1. CHECK FOR "BAKED" INSTALL (Fastest - seconds)
+find_package(JUCE CONFIG QUIET PATHS "C:/JUCE_Installed/lib/cmake/JUCE-8.0.12")
 
 if(JUCE_FOUND)
     message(STATUS "SUCCESS: Using Pre-Built JUCE at ${JUCE_DIR}")
