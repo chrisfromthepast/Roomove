@@ -91,3 +91,9 @@ jobs:
               Write-Error "Deployment failed: Source folder $Source does not exist."
               exit 1
           }
+      - name: Debug Path Hunt
+        shell: powershell
+        run: |
+           Write-Host "Searching for any .aaxplugin or .dll files..."
+           Get-ChildItem -Path build_native -Filter "*.aaxplugin" -Recurse
+           Get-ChildItem -Path build_native -Filter "*.dll" -Recurse
