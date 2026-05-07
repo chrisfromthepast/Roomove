@@ -35,33 +35,44 @@ jobs:
               echo "DSP_ENABLED=false" >> $env:GITHUB_ENV
           }
 
-      # --- 3. BUILD DSP (ONLY IF READY) ---
+# --- 3. BUILD DSP (THE ROBUST VERSION) ---
       - name: Configure CMake (DSP)
         if: env.DSP_ENABLED == 'true'
         run: |
-          # Note: Requires Ninja or NMake generator for TI cross-compilation
+          # 1. Clean the DSP build directory to prevent MSVC cross-contamination
+          if (Test-Path build_dsp) { Remove-Item -Recurse -Force build_dsp }
+          
+          # 2. Run the actual cross-compilation configure
           cmake -B build_dsp -G "Ninja" `
-          -DCMAKE_TOOLCHAIN_FILE="path/to/your/ti_toolchain.cmake" `
+          -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" `
           -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
           -DTI_CGT_DIR="C:/TI/c6000_7.4.24" `
-          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_BUILD_TYPE=Release `
+          -DAAX_DSP_TYPE=HDX # Specific flag often used in JUCE/AAX wrappers
 
       - name: Build DSP Binary
         if: env.DSP_ENABLED == 'true'
         run: cmake --build build_dsp --config Release --target Roomove_DSP
 
+      - name: Strip Debug Symbols (TI Toolset)
+        if: env.DSP_ENABLED == 'true'
+        run: |
+          # Uses the TI 'strip6x' tool to optimize the binary size for S6L memory
+          & "C:\TI\c6000_7.4.24\bin\strip6x.exe" build_dsp/Roomove_DSP.so
+
       - name: Inject DSP into AAX Bundle
         if: env.DSP_ENABLED == 'true'
         shell: powershell
         run: |
-          # Merges the TI binary into the Pro Tools plugin folder structure
-          $DSP_Source = "build_dsp/Roomove_DSP.so" # Adjust extension based on CMake output
-          $DSP_Dest = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin/Contents/DSP/"
+          # 1. Define the internal Avid-spec directory structure
+          $DSP_Dest = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin/Contents/Resources/"
           
-          New-Item -ItemType Directory -Force -Path $DSP_Dest
-          Copy-Item -Path $DSP_Source -Destination $DSP_Dest -Force
-          Write-Host "DSP binary successfully injected into the AAX bundle."
-
+          # 2. Ensure the destination exists (S6L looks specifically in Resources or DSP folders)
+          if (!(Test-Path $DSP_Dest)) { New-Item -ItemType Directory -Force -Path $DSP_Dest }
+          
+          # 3. Copy the TI binary
+          Copy-Item -Path "build_dsp/Roomove_DSP.so" -Destination $DSP_Dest -Force
+          Write-Host "DSP binary stripped and injected into AAX bundle."
       # --- 4. DEPLOYMENT ---
       - name: Deploy to Local Plug-Ins Folder
         shell: powershell
