@@ -2,14 +2,12 @@ cmake_minimum_required(VERSION 3.22)
 
 project(Roomove VERSION 0.1.0)
 
-# 1. Try to find local JUCE first
-find_package(JUCE CONFIG QUIET)
-
-if(JUCE_FOUND)
-    message(STATUS "SUCCESS: Using local JUCE found at ${JUCE_DIR}")
+# 1. Check if the local directory exists
+if(EXISTS "C:/JUCE/CMakeLists.txt")
+    message(STATUS "SUCCESS: Using local JUCE source at C:/JUCE")
+    add_subdirectory("C:/JUCE" JUCE)
 else()
-    message(STATUS "WARNING: Local JUCE not found. Falling back to FetchContent (this will take a while)...")
-    
+    message(STATUS "WARNING: Local JUCE folder not found. Falling back to FetchContent...")
     include(FetchContent)
     FetchContent_Declare(
         JUCE
