@@ -14,7 +14,7 @@ jobs:
       - name: Configure CMake (Native x64)
         run: |
           cmake -B build_native -G "Visual Studio 17 2022" -A x64 `
-          -DAAX_SDK_PATH="C:/SDKs/aax-sdk" `
+          -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
           -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Native Binary
@@ -25,8 +25,7 @@ jobs:
         id: check_ti
         shell: powershell
         run: |
-          # UPDATE THIS ONCE YOUR DOWNLOAD FINISHES
-          $TI_Path = "C:\ti\c6000_7.4.24" 
+          $TI_Path = "C:\TI\c6000_7.4.24" 
           
           if (Test-Path $TI_Path) {
               Write-Host "TI Compiler found at $TI_Path. Enabling DSP build."
@@ -43,8 +42,8 @@ jobs:
           # Note: Requires Ninja or NMake generator for TI cross-compilation
           cmake -B build_dsp -G "Ninja" `
           -DCMAKE_TOOLCHAIN_FILE="path/to/your/ti_toolchain.cmake" `
-          -DAAX_SDK_PATH="C:/SDKs/aax-sdk" `
-          -DTI_CGT_DIR="C:/ti/cgt_version_here" `
+          -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
+          -DTI_CGT_DIR="C:/TI/c6000_7.4.24" `
           -DCMAKE_BUILD_TYPE=Release
 
       - name: Build DSP Binary
