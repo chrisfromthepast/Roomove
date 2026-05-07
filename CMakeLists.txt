@@ -2,14 +2,22 @@ cmake_minimum_required(VERSION 3.22)
 
 project(Roomove VERSION 0.1.0)
 
-# Fetch JUCE if not already available
-include(FetchContent)
-FetchContent_Declare(
-    JUCE
-    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG        7.0.9
-)
-FetchContent_MakeAvailable(JUCE)
+# 1. Try to find local JUCE first
+find_package(JUCE CONFIG QUIET)
+
+if(JUCE_FOUND)
+    message(STATUS "SUCCESS: Using local JUCE found at ${JUCE_DIR}")
+else()
+    message(STATUS "WARNING: Local JUCE not found. Falling back to FetchContent (this will take a while)...")
+    
+    include(FetchContent)
+    FetchContent_Declare(
+        JUCE
+        GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+        GIT_TAG        7.0.9
+    )
+    FetchContent_MakeAvailable(JUCE)
+endif()
 
 # Point to the AAX SDK
 # Hardcoded paths for local S6L AAX DSP build
