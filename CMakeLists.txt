@@ -60,17 +60,13 @@ else()
     juce_set_aax_sdk_path("${AAX_SDK_PATH}")
 
     # I changed the target name to Roomove_AAX to match your manual.yaml build steps!
-    juce_add_plugin(Roomove_AAX
-        COMPANY_NAME            "chrisfromthepast"
-        IS_SYNTH                FALSE
-        NEEDS_MIDI_INPUT        FALSE
-        NEEDS_MIDI_OUTPUT       FALSE
-        IS_MIDI_EFFECT          FALSE
-        EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-        COPY_PLUGIN_AFTER_BUILD FALSE
+juce_add_plugin(Roomove_AAX
+        # ... your other settings ...
+        COPY_PLUGIN_AFTER_BUILD TRUE   # <--- CHANGE TO TRUE
         PLUGIN_MANUFACTURER_CODE Cftp
         PLUGIN_CODE             Rmov
         FORMATS                 AAX
+        AAX_IDENTIFIER          "com.chrisfromthepast.Roomove" # Add this for better ID tracking
         PRODUCT_NAME            "Roomove"
     )
 
