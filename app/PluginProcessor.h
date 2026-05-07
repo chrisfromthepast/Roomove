@@ -9,6 +9,9 @@
 class ArmorAudioProcessor : public juce::AudioProcessor
 {
 public:
+    ArmorAudioProcessor();
+    ~ArmorAudioProcessor() override = default;
+
     const juce::String getName() const override;
 
     bool acceptsMidi() const override;
@@ -31,6 +34,10 @@ public:
 
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
+
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    juce::AudioProcessorValueTreeState apvts;
 
 private:
 #ifndef __TMS320C6X__

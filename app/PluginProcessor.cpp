@@ -1,5 +1,32 @@
 #include "PluginProcessor.h"
 
+namespace
+{
+    constexpr auto armorStrengthParameterId = "armor_strength";
+    constexpr auto armorStrengthParameterName = "Armor Strength";
+}
+
+ArmorAudioProcessor::ArmorAudioProcessor()
+    : juce::AudioProcessor (BusesProperties()
+        .withInput ("Input", juce::AudioChannelSet::mono(), true)
+        .withOutput ("Output", juce::AudioChannelSet::mono(), true)),
+      apvts (*this, nullptr, "Parameters", createParameterLayout())
+{
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout ArmorAudioProcessor::createParameterLayout()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> parameters;
+
+    parameters.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { armorStrengthParameterId, 1 },
+        armorStrengthParameterName,
+        juce::NormalisableRange<float> { 0.0f, 1.0f, 0.01f },
+        1.0f));
+
+    return { parameters.begin(), parameters.end() };
+}
+
 void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     // 1. Pre-allocate EVERYTHING (Safe and required for DSP)
@@ -20,6 +47,9 @@ void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
 void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
+    juce::ignoreUnused (midiMessages);
+
+    const auto armorStrength = apvts.getRawParameterValue (armorStrengthParameterId)->load();
     auto* channelData = buffer.getWritePointer(0);
 
     for (int i = 0; i < buffer.getNumSamples(); ++i)
@@ -34,7 +64,7 @@ void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
         }
 
         // 2. Apply Mask (Zero Latency path - safe for both Native and DSP)
-        channelData[i] *= currentMask;
+        channelData[i] *= juce::jmap (armorStrength, 1.0f, currentMask);
     }
 
     // 3. Hide the background thread trigger from the TI compiler
@@ -68,8 +98,18 @@ juce::AudioProcessorEditor* ArmorAudioProcessor::createEditor()
     return nullptr;
 }
 
-void ArmorAudioProcessor::getStateInformation (juce::MemoryBlock&) {}
-void ArmorAudioProcessor::setStateInformation (const void*, int) {}
+void ArmorAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+{
+    if (auto state = apvts.copyState(); auto xml = state.createXml())
+        copyXmlToBinary (*xml, destData);
+}
+
+void ArmorAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+{
+    if (auto xmlState = getXmlFromBinary (data, sizeInBytes))
+        if (xmlState->hasTagName (apvts.state.getType()))
+            apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+}
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
