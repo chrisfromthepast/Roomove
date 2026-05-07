@@ -43,12 +43,18 @@ jobs:
           if (Test-Path build_dsp) { Remove-Item -Recurse -Force build_dsp }
           
           # 2. Run the actual cross-compilation configure
-          cmake -B build_dsp -G "Ninja" `
+          cmake -B build_dsp -G "NMake Makefiles" `
           -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" `
           -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
           -DTI_CGT_DIR="C:/TI/c6000_7.4.24" `
-          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_BUILD_TYPE=Release
           -DAAX_DSP_TYPE=HDX # Specific flag often used in JUCE/AAX wrappers
+
+
+
+# Change -G "Ninja" to -G "NMake Makefiles"
+
+
 
       - name: Build DSP Binary
         if: env.DSP_ENABLED == 'true'
