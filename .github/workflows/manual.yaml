@@ -22,17 +22,17 @@ jobs:
           # Added --parallel 8 to allow MSBuild to compile multiple targets at once
           cmake --build build_native --config Release --target Roomove_AAX --parallel 8
 
-      # --- 2. THE GRACEFUL CHECK ---
+# --- 2. THE GRACEFUL CHECK ---
       - name: Check for TI Compiler
         id: check_ti
         shell: powershell
         run: |
-          $TI_Path = "C:\TI\c6000_7.4.24"
+          $TI_Path = "C:\TI\c6000_7.4.24\bin\cl6x.exe"
           if (Test-Path $TI_Path) {
-              Write-Host "TI Compiler found at $TI_Path. Enabling DSP build."
+              Write-Host "TI Compiler found! Enabling DSP build."
               echo "DSP_ENABLED=true" >> $env:GITHUB_ENV
           } else {
-              Write-Host "##[warning] TI Compiler not found at $TI_Path. Skipping DSP build for now. Pipeline will continue with Native only."
+              Write-Host "##[warning] TI Compiler not found. Skipping DSP build for now. Pipeline will continue with Native only."
               echo "DSP_ENABLED=false" >> $env:GITHUB_ENV
           }
 
