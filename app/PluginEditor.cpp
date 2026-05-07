@@ -46,7 +46,9 @@ void MachinedFaderLookAndFeel::drawLinearSlider (juce::Graphics& g,
     }
 
     g.setColour (juce::Colours::white.withAlpha (0.7f));
-    g.setFont (juce::Font ("Consolas", 12.0f, juce::Font::bold));
+    auto font = juce::Font (12.0f, juce::Font::bold);
+    font.setTypefaceName (juce::Font::getDefaultMonospacedFontName());
+    g.setFont (font);
     g.drawText ("ROOM",
                 juce::Rectangle<int> ((int) std::round (faderX),
                                       (int) std::round (faderY + (faderHeight * 0.5f) - 6.0f),
@@ -56,7 +58,7 @@ void MachinedFaderLookAndFeel::drawLinearSlider (juce::Graphics& g,
 }
 
 RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& p)
-    : AudioProcessorEditor (&p), audioProcessor (p)
+    : AudioProcessorEditor (&p)
 {
     setSize (150, 400);
 
@@ -66,7 +68,7 @@ RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& p)
     addAndMakeVisible (roomSlider);
 
     roomAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
-        audioProcessor.apvts, "armor_strength", roomSlider);
+        p.apvts, "armor_strength", roomSlider);
 }
 
 RoomoveAudioEditor::~RoomoveAudioEditor()

@@ -28,7 +28,6 @@ public:
     void resized() override;
 
 private:
-    ArmorAudioProcessor& audioProcessor;
     MachinedFaderLookAndFeel machinedLookAndFeel;
     juce::Slider roomSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> roomAttachment;
