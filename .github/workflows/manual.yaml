@@ -51,31 +51,31 @@ jobs:
           echo --- Starting DSP Build ---
           cmake --build build_dsp --config Release --target Roomove_DSP
 
-# --- 3.5 INJECTION (The Bridge) ---
       - name: Inject DSP and Page Tables
         if: env.DSP_ENABLED == 'true'
         shell: powershell
         run: |
-          # This is where the JUCE build created the plugin shell
-          $Bundle_Res = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin/Contents/Resources/"
+          # FIX: Added _AAX to the path to match JUCE 8 output
+          $Bundle_Res = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin/Contents/Resources/"
           
-          # Ensure the directory exists
           if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res }
           
-          # 1. Inject the DSP Binary (libRoomove_DSP.a was built by TI)
-          # We rename it to Roomove_DSP.a so the AAX host can find it easily
           Copy-Item -Path "build_dsp/libRoomove_DSP.a" -Destination "${Bundle_Res}Roomove_DSP.a" -Force
-          
-          # 2. Inject the Page Table XML (Your control surface map)
           Copy-Item -Path "Resources/Roomove_PageTable.xml" -Destination $Bundle_Res -Force
-          
-          Write-Host "Injection complete: DSP binary and Page Table are now inside the bundle."
+          Write-Host "Injected into: $Bundle_Res"
 
-      # --- 4. DEPLOYMENT (The Final Move) ---
       - name: Deploy to Local Plug-Ins Folder
         shell: powershell
         run: |
-          # Now we move the fully 'injected' bundle to the Avid folder
-          $Source = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin"
+          # FIX: Added _AAX to the source path
+          $Source = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin"
           $Dest = "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\Roomove.aaxplugin"
-          # ... rest of your deployment code ...
+          
+          if (Test-Path $Source) {
+              if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
+              Copy-Item -Path $Source -Destination $Dest -Recurse -Force
+              Write-Host "Deployment Successful from $Source"
+          } else {
+              Write-Error "SOURCE NOT FOUND: $Source. Check build_native folder structure!"
+              exit 1
+          }
