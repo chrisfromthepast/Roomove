@@ -36,20 +36,24 @@ jobs:
               echo "DSP_ENABLED=false" >> $env:GITHUB_ENV
           }
 
-      # --- 3. BUILD DSP (THE ROBUST VERSION) ---
+
+# --- 3. BUILD DSP (THE ROBUST VERSION) ---
       - name: Configure CMake (DSP)
         if: env.DSP_ENABLED == 'true'
-        shell: powershell
+        shell: cmd
         run: |
-          # 1. Clean the DSP build directory to prevent MSVC cross-contamination
-          if (Test-Path build_dsp) { Remove-Item -Recurse -Force build_dsp }
+          if exist build_dsp rmdir /s /q build_dsp
           
-          # 2. Initialize the x64 Developer Command Prompt so CMake can find nmake
-          & "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
           
-          # 3. Run CMake (All on one line to prevent PowerShell breaking on the flags)
           cmake -B build_dsp -G "NMake Makefiles" -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" -DTI_CGT_DIR="C:/TI/c6000_7.4.24" -DAAX_DSP_TYPE=HDX -DCMAKE_BUILD_TYPE=Release
 
+      - name: Build DSP Binary
+        if: env.DSP_ENABLED == 'true'
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          cmake --build build_dsp --config Release --target Roomove_DSP
       - name: Build DSP Binary
         if: env.DSP_ENABLED == 'true'
         shell: powershell
