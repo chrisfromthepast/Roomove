@@ -14,9 +14,11 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(JUCE)
 
 # Point to the AAX SDK (passed via -DAAX_SDK_PATH on the CMake command line)
-if(DEFINED AAX_SDK_PATH)
-    juce_set_aax_sdk_path("${AAX_SDK_PATH}")
-endif()
+# Hardcoded paths for local S6L AAX DSP build
+set(AAX_SDK_PATH "C:/SDKs/AAX-SDK") 
+set(ENV{TI_CGT_DIR} "C:/TI/c6000_7.4.24")
+
+juce_set_aax_sdk_path("${AAX_SDK_PATH}")
 
 juce_add_plugin(Roomove
     COMPANY_NAME            "chrisfromthepast"
