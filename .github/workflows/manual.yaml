@@ -20,9 +20,8 @@ jobs:
       - name: Build Native Binary
         shell: powershell
         run: |
-          # Use ALL_BUILD to ensure JUCE's packaging scripts run
+          # Use ALL_BUILD to trigger the JUCE packaging/stitching script
           cmake --build build_native --config Release --target ALL_BUILD --parallel 8
-
       # --- 2. THE GRACEFUL CHECK ---
       - name: Check for TI Compiler
         id: check_ti
