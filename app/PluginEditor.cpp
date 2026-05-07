@@ -1,21 +1,21 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-ArmorAudioEditor::ArmorAudioEditor (ArmorAudioProcessor& p)
+RoomoveAudioEditor::RoomoveAudioEditor (RoomoveAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
     // -- Intensity Knob --
-    armorStrengthKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    armorStrengthKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
-    addAndMakeVisible(armorStrengthKnob);
+    intensityKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    intensityKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    addAndMakeVisible(intensityKnob);
 
-    strengthLabel.setText("Armor Strength", juce::dontSendNotification);
+    strengthLabel.setText("Intensity", juce::dontSendNotification);
     strengthLabel.setJustificationType(juce::Justification::centred);
-    strengthLabel.attachToComponent(&armorStrengthKnob, false);
+    strengthLabel.attachToComponent(&intensityKnob, false);
     addAndMakeVisible(strengthLabel);
 
     // Uncomment and connect to your APVTS once created in the Processor
-    // strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "ARMOR_STRENGTH", armorStrengthKnob);
+    // strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "ROOMOVE_STRENGTH", intensityKnob);
 
     // -- VU Meter --
     addAndMakeVisible(vuMeter);
@@ -36,9 +36,9 @@ ArmorAudioEditor::ArmorAudioEditor (ArmorAudioProcessor& p)
     startTimerHz(30); 
 }
 
-ArmorAudioEditor::~ArmorAudioEditor() {}
+RoomoveAudioEditor::~RoomoveAudioEditor() {}
 
-void ArmorAudioEditor::paint (juce::Graphics& g)
+void RoomoveAudioEditor::paint (juce::Graphics& g)
 {
     g.fillAll (juce::Colours::black);
 
@@ -54,7 +54,7 @@ void ArmorAudioEditor::paint (juce::Graphics& g)
     g.fillRect(vuBounds.getX(), vuBounds.getBottom() - fillHeight, vuBounds.getWidth(), fillHeight);
 }
 
-void ArmorAudioEditor::resized()
+void RoomoveAudioEditor::resized()
 {
     auto area = getLocalBounds().reduced(20);
 
@@ -62,7 +62,7 @@ void ArmorAudioEditor::resized()
     auto topArea = area.removeFromTop(area.getHeight() / 2);
     
     // Knob on left
-    armorStrengthKnob.setBounds(topArea.removeFromLeft(topArea.getWidth() / 2).reduced(10, 30));
+    intensityKnob.setBounds(topArea.removeFromLeft(topArea.getWidth() / 2).reduced(10, 30));
     
     // VU Meter on right
     auto vuArea = topArea.reduced(20, 30);
@@ -74,7 +74,7 @@ void ArmorAudioEditor::resized()
     errorLog.setBounds(area);
 }
 
-void ArmorAudioEditor::timerCallback()
+void RoomoveAudioEditor::timerCallback()
 {
     // 1. Update VU Meter
     // Requires an atomic float in your Processor (e.g., std::atomic<float> currentMaskLevel)
