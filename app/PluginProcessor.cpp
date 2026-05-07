@@ -45,10 +45,8 @@ void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 #endif
 }
 
-void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
-    juce::ignoreUnused (midiMessages);
-
     const auto armorStrength = apvts.getRawParameterValue (armorStrengthParameterId)->load();
     auto* channelData = buffer.getWritePointer(0);
 
@@ -101,7 +99,9 @@ juce::AudioProcessorEditor* ArmorAudioProcessor::createEditor()
 
 void ArmorAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    if (auto state = apvts.copyState(); auto xml = state.createXml())
+    auto state = apvts.copyState();
+
+    if (auto xml = state.createXml())
         copyXmlToBinary (*xml, destData);
 }
 
