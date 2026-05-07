@@ -13,7 +13,7 @@ jobs:
       - name: Configure CMake (Native x64)
         shell: powershell
         run: |
-          cmake -B build_native -G "Visual Studio 17 2022" -A x64 `
+          cmake -B build_native --config Release --parallel 8 -G "Visual Studio 17 2022" -A x64 `
           -DJUCE_DIR="C:/JUCE_Installed/lib/cmake/JUCE" `
           -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
           -DCMAKE_BUILD_TYPE=Release
