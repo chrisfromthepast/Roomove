@@ -10,11 +10,13 @@ jobs:
         with:
           submodules: true
 
-      # --- 1. ALWAYS BUILD NATIVE ---
+# --- 1. ALWAYS BUILD NATIVE ---
       - name: Configure CMake (Native x64)
         run: |
           cmake -B build_native -G "Visual Studio 17 2022" -A x64 `
           -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
+          -DJUCE_DIR="C:/JUCE" `
+          -DCMAKE_PREFIX_PATH="C:/JUCE" `
           -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Native Binary
