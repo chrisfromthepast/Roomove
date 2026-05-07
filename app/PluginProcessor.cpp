@@ -4,6 +4,7 @@ namespace
 {
     constexpr auto armorStrengthParameterId = "armor_strength";
     constexpr auto armorStrengthParameterName = "Armor Strength";
+    constexpr auto armorStrengthParameterVersion = 1;
 }
 
 ArmorAudioProcessor::ArmorAudioProcessor()
@@ -19,7 +20,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ArmorAudioProcessor::createP
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> parameters;
 
     parameters.push_back (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID { armorStrengthParameterId, 1 },
+        juce::ParameterID { armorStrengthParameterId, armorStrengthParameterVersion },
         armorStrengthParameterName,
         juce::NormalisableRange<float> { 0.0f, 1.0f, 0.01f },
         1.0f));
@@ -47,7 +48,8 @@ void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
 void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
-    const auto armorStrength = apvts.getRawParameterValue (armorStrengthParameterId)->load();
+    const auto* armorStrengthParameter = apvts.getRawParameterValue (armorStrengthParameterId);
+    const auto armorStrength = armorStrengthParameter != nullptr ? armorStrengthParameter->load() : 1.0f;
     auto* channelData = buffer.getWritePointer(0);
 
     for (int i = 0; i < buffer.getNumSamples(); ++i)
