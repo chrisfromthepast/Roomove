@@ -20,7 +20,8 @@ jobs:
       - name: Build Native Binary
         shell: powershell
         run: |
-          cmake --build build_native --config Release --target Roomove_AAX --parallel 8
+          # Removing --target forces the 'ALL' build, which triggers the JUCE bundle stitching
+          cmake --build build_native --config Release --parallel 8
 
       # --- 2. THE GRACEFUL CHECK ---
       - name: Check for TI Compiler
