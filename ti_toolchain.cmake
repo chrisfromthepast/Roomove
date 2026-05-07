@@ -1,10 +1,11 @@
 set(CMAKE_SYSTEM_NAME Generic)
+set(CMAKE_SYSTEM_PROCESSOR c6000)
 
-# Path to the TI compiler we just set in the YAML
-set(TI_CGT_DIR $ENV{TI_CGT_DIR})
+set(TI_DIR "C:/TI/c6000_7.4.24")
 
-set(CMAKE_C_COMPILER "${TI_CGT_DIR}/bin/cl6x.exe")
-set(CMAKE_CXX_COMPILER "${TI_CGT_DIR}/bin/cl6x.exe")
+set(CMAKE_C_COMPILER "${TI_DIR}/bin/cl6x.exe")
+set(CMAKE_CXX_COMPILER "${TI_DIR}/bin/cl6x.exe")
 
-# AAX DSP specific flags to keep the TI compiler happy
-set(CMAKE_CXX_FLAGS "--abi=eabi -mv6600 --gcc" CACHE STRING "")
+# --- THE FIX ---
+set(CMAKE_C_COMPILER_WORKS TRUE)
+set(CMAKE_CXX_COMPILER_WORKS TRUE)
