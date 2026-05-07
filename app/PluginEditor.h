@@ -56,8 +56,7 @@ private:
     ArmorAudioProcessor& audioProcessor;
     MachinedFaderLookAndFeel machinedFaderLookAndFeel;
 
-    // 1. Intensity knob
-    juce::Slider intensityKnob;
+    juce::Slider armorStrengthFader;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> strengthAttachment;
     juce::Label strengthLabel;
 

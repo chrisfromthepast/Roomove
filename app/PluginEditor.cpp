@@ -5,20 +5,20 @@ RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
     // -- Intensity Knob --
-    intensityKnob.setLookAndFeel(&machinedFaderLookAndFeel);
-    intensityKnob.setSliderStyle(juce::Slider::LinearVertical);
-    intensityKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
-    addAndMakeVisible(intensityKnob);
+    armorStrengthFader.setLookAndFeel(&machinedFaderLookAndFeel);
+    armorStrengthFader.setSliderStyle(juce::Slider::LinearVertical);
+    armorStrengthFader.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    addAndMakeVisible(armorStrengthFader);
 
     strengthLabel.setText("Armor Strength", juce::dontSendNotification);
     strengthLabel.setJustificationType(juce::Justification::centred);
-    strengthLabel.attachToComponent(&intensityKnob, false);
+    strengthLabel.attachToComponent(&armorStrengthFader, false);
     addAndMakeVisible(strengthLabel);
 
     strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         audioProcessor.apvts,
         RoomoveParameterIds::armorStrength,
-        intensityKnob);
+        armorStrengthFader);
 
     // -- VU Meter --
     addAndMakeVisible(vuMeter);
@@ -41,7 +41,7 @@ RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& p)
 
 RoomoveAudioEditor::~RoomoveAudioEditor()
 {
-    intensityKnob.setLookAndFeel(nullptr);
+    armorStrengthFader.setLookAndFeel(nullptr);
 }
 
 void RoomoveAudioEditor::paint (juce::Graphics& g)
@@ -67,8 +67,8 @@ void RoomoveAudioEditor::resized()
     // Split top half for controls, bottom half for logs
     auto topArea = area.removeFromTop(area.getHeight() / 2);
     
-    // Knob on left
-    intensityKnob.setBounds(topArea.removeFromLeft(topArea.getWidth() / 2).reduced(10, 30));
+    // Fader on left
+    armorStrengthFader.setBounds(topArea.removeFromLeft(topArea.getWidth() / 2).reduced(10, 30));
     
     // VU Meter on right
     auto vuArea = topArea.reduced(20, 30);
