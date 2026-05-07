@@ -1,95 +1,87 @@
-#include "PluginProcessor.h"
 #include "PluginEditor.h"
+
+void MachinedFaderLookAndFeel::drawLinearSlider (juce::Graphics& g,
+                                                 int x,
+                                                 int y,
+                                                 int width,
+                                                 int height,
+                                                 float sliderPos,
+                                                 float minSliderPos,
+                                                 float maxSliderPos,
+                                                 const juce::Slider::SliderStyle sliderStyle,
+                                                 juce::Slider& slider)
+{
+    juce::ignoreUnused (minSliderPos, maxSliderPos, sliderStyle, slider);
+
+    g.setColour (juce::Colours::black.withAlpha (0.5f));
+    g.fillRoundedRectangle ((float) x + (float) width * 0.45f,
+                            (float) y,
+                            (float) width * 0.1f,
+                            (float) height,
+                            2.0f);
+
+    const auto faderWidth = (float) width * 0.8f;
+    constexpr auto faderHeight = 60.0f;
+    const auto faderX = (float) x + ((float) width - faderWidth) * 0.5f;
+    const auto faderY = sliderPos - (faderHeight * 0.5f);
+
+    const juce::Colour gradientStart (0xff323232);
+    const juce::Colour gradientEnd (0xff1a1a1a);
+    const juce::ColourGradient gradient (gradientStart,
+                                         faderX,
+                                         faderY,
+                                         gradientEnd,
+                                         faderX,
+                                         faderY + faderHeight,
+                                         false);
+
+    g.setGradientFill (gradient);
+    g.fillRoundedRectangle (faderX, faderY, faderWidth, faderHeight, 4.0f);
+
+    g.setColour (juce::Colours::black.withAlpha (0.3f));
+    for (int i = 1; i < 6; ++i)
+    {
+        const auto lineY = faderY + ((float) i * (faderHeight / 6.0f));
+        g.drawLine (faderX + 5.0f, lineY, faderX + faderWidth - 5.0f, lineY, 1.5f);
+    }
+
+    g.setColour (juce::Colours::white.withAlpha (0.7f));
+    g.setFont (juce::Font ("Consolas", 12.0f, juce::Font::bold));
+    g.drawText ("ROOM",
+                juce::Rectangle<int> ((int) std::round (faderX),
+                                      (int) std::round (faderY + (faderHeight * 0.5f) - 6.0f),
+                                      (int) std::round (faderWidth),
+                                      12),
+                juce::Justification::centred);
+}
 
 RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
-    // -- Intensity Knob --
-    intensityKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    intensityKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
-    addAndMakeVisible(intensityKnob);
+    setSize (150, 400);
 
-    strengthLabel.setText("Intensity", juce::dontSendNotification);
-    strengthLabel.setJustificationType(juce::Justification::centred);
-    strengthLabel.attachToComponent(&intensityKnob, false);
-    addAndMakeVisible(strengthLabel);
+    roomSlider.setSliderStyle (juce::Slider::LinearVertical);
+    roomSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    roomSlider.setLookAndFeel (&machinedLookAndFeel);
+    addAndMakeVisible (roomSlider);
 
-    // Uncomment and connect to your APVTS once created in the Processor
-    // strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "ROOMOVE_STRENGTH", intensityKnob);
-
-    // -- VU Meter --
-    addAndMakeVisible(vuMeter);
-
-    // -- Error Logging --
-    errorLog.setMultiLine(true);
-    errorLog.setReadOnly(true);
-    errorLog.setScrollbarsShown(true);
-    errorLog.setCaretVisible(false);
-    addAndMakeVisible(errorLog);
-
-    logLabel.setText("Error Log", juce::dontSendNotification);
-    logLabel.attachToComponent(&errorLog, false);
-    addAndMakeVisible(logLabel);
-
-    // Window size and UI polling rate
-    setSize (400, 350);
-    startTimerHz(30); 
+    roomAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        audioProcessor.apvts, "armor_strength", roomSlider);
 }
 
-RoomoveAudioEditor::~RoomoveAudioEditor() {}
+RoomoveAudioEditor::~RoomoveAudioEditor()
+{
+    roomSlider.setLookAndFeel (nullptr);
+}
 
 void RoomoveAudioEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colours::black);
-
-    // Draw VU Meter Background & Level
-    auto vuBounds = vuMeter.getBounds().toFloat();
-    g.setColour(juce::Colours::darkgrey);
-    g.fillRect(vuBounds);
-    
-    g.setColour(juce::Colours::green);
-    float fillHeight = vuBounds.getHeight() * currentVuLevel;
-    
-    // Fills from bottom to top
-    g.fillRect(vuBounds.getX(), vuBounds.getBottom() - fillHeight, vuBounds.getWidth(), fillHeight);
+    g.fillAll (juce::Colour (0xff222222));
+    g.setColour (juce::Colours::black);
+    g.drawRect (getLocalBounds(), 2);
 }
 
 void RoomoveAudioEditor::resized()
 {
-    auto area = getLocalBounds().reduced(20);
-
-    // Split top half for controls, bottom half for logs
-    auto topArea = area.removeFromTop(area.getHeight() / 2);
-    
-    // Knob on left
-    intensityKnob.setBounds(topArea.removeFromLeft(topArea.getWidth() / 2).reduced(10, 30));
-    
-    // VU Meter on right
-    auto vuArea = topArea.reduced(20, 30);
-    vuArea.setWidth(30);
-    vuMeter.setBounds(vuArea);
-
-    // Log at the bottom
-    area.removeFromTop(20); // Spacing for the label
-    errorLog.setBounds(area);
-}
-
-void RoomoveAudioEditor::timerCallback()
-{
-    // 1. Update VU Meter
-    // Requires an atomic float in your Processor (e.g., std::atomic<float> currentMaskLevel)
-    // currentVuLevel = audioProcessor.currentMaskLevel.load();
-    
-    // 2. Poll for Errors
-    // Requires a thread-safe string queue or simple lock-free flag in your Processor
-    /*
-    juce::String newError = audioProcessor.popNextErrorMessage();
-    if (newError.isNotEmpty()) 
-    {
-        errorLog.moveCaretToEnd();
-        errorLog.insertTextAtCaret(newError + "\n");
-    }
-    */
-
-    repaint(); // Triggers the paint() method to update the VU meter
+    roomSlider.setBounds (getLocalBounds().reduced (20, 40));
 }
