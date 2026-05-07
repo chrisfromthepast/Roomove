@@ -2,18 +2,18 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 
-class ArmorAudioEditor : public juce::AudioProcessorEditor, public juce::Timer
+class RoomoveAudioEditor : public juce::AudioProcessorEditor, public juce::Timer
 {
 public:
-    ArmorAudioEditor (ArmorAudioProcessor&);
-    ~ArmorAudioEditor() override;
+    RoomoveAudioEditor (RoomoveAudioProcessor&);
+    ~RoomoveAudioEditor() override;
 
     void paint (juce::Graphics&) override;
     void resized() override;
     void timerCallback() override;
 
 private:
-    ArmorAudioProcessor& audioProcessor;
+    RoomoveAudioProcessor& audioProcessor;
 
     // 1. Intensity Knob (Armor Strength)
     juce::Slider armorStrengthKnob;
@@ -28,5 +28,5 @@ private:
     juce::TextEditor errorLog;
     juce::Label logLabel;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ArmorAudioEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RoomoveAudioEditor)
 };

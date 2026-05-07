@@ -1,7 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-ArmorAudioEditor::ArmorAudioEditor (ArmorAudioProcessor& p)
+RoomoveAudioEditor::RoomoveAudioEditor (RoomoveAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
     // -- Intensity Knob --
@@ -36,9 +36,9 @@ ArmorAudioEditor::ArmorAudioEditor (ArmorAudioProcessor& p)
     startTimerHz(30); 
 }
 
-ArmorAudioEditor::~ArmorAudioEditor() {}
+RoomoveAudioEditor::~RoomoveAudioEditor() {}
 
-void ArmorAudioEditor::paint (juce::Graphics& g)
+void RoomoveAudioEditor::paint (juce::Graphics& g)
 {
     g.fillAll (juce::Colours::black);
 
@@ -54,7 +54,7 @@ void ArmorAudioEditor::paint (juce::Graphics& g)
     g.fillRect(vuBounds.getX(), vuBounds.getBottom() - fillHeight, vuBounds.getWidth(), fillHeight);
 }
 
-void ArmorAudioEditor::resized()
+void RoomoveAudioEditor::resized()
 {
     auto area = getLocalBounds().reduced(20);
 
@@ -74,7 +74,7 @@ void ArmorAudioEditor::resized()
     errorLog.setBounds(area);
 }
 
-void ArmorAudioEditor::timerCallback()
+void RoomoveAudioEditor::timerCallback()
 {
     // 1. Update VU Meter
     // Requires an atomic float in your Processor (e.g., std::atomic<float> currentMaskLevel)
