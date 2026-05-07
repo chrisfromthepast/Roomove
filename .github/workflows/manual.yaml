@@ -51,30 +51,31 @@ jobs:
           echo --- Starting DSP Build ---
           cmake --build build_dsp --config Release --target Roomove_DSP
 
-      - name: Strip & Inject DSP
+# --- 3.5 INJECTION (The Bridge) ---
+      - name: Inject DSP and Page Tables
         if: env.DSP_ENABLED == 'true'
         shell: powershell
         run: |
-          # Use the actual .a file generated for the DSP target
-          $DSP_Source = "build_dsp/libRoomove_DSP.a"
-          $Bundle_Dest = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin/Contents/Resources/"
+          # This is where the JUCE build created the plugin shell
+          $Bundle_Res = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin/Contents/Resources/"
           
-          if (!(Test-Path $Bundle_Dest)) { New-Item -ItemType Directory -Force -Path $Bundle_Dest }
+          # Ensure the directory exists
+          if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res }
           
-          # 1. Strip the binary (optional but recommended for production)
-          & "C:\TI\c6000_7.4.24\bin\strip6x.exe" $DSP_Source -o "build_dsp/Roomove_DSP.stripped"
+          # 1. Inject the DSP Binary (libRoomove_DSP.a was built by TI)
+          # We rename it to Roomove_DSP.a so the AAX host can find it easily
+          Copy-Item -Path "build_dsp/libRoomove_DSP.a" -Destination "${Bundle_Res}Roomove_DSP.a" -Force
           
-          # 2. Inject into Bundle
-          Copy-Item -Path "build_dsp/Roomove_DSP.stripped" -Destination "${Bundle_Dest}Roomove_DSP.a" -Force
-          Copy-Item -Path "Resources/Roomove_PageTable.xml" -Destination $Bundle_Dest -Force
-          Write-Host "DSP successfully injected."
+          # 2. Inject the Page Table XML (Your control surface map)
+          Copy-Item -Path "Resources/Roomove_PageTable.xml" -Destination $Bundle_Res -Force
+          
+          Write-Host "Injection complete: DSP binary and Page Table are now inside the bundle."
 
-      # --- 4. DEPLOYMENT ---
+      # --- 4. DEPLOYMENT (The Final Move) ---
       - name: Deploy to Local Plug-Ins Folder
         shell: powershell
         run: |
+          # Now we move the fully 'injected' bundle to the Avid folder
           $Source = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin"
           $Dest = "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\Roomove.aaxplugin"
-          if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
-          Copy-Item -Path $Source -Destination $Dest -Recurse -Force
-          Write-Host "Deployment Complete."
+          # ... rest of your deployment code ...
