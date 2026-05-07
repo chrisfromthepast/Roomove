@@ -8,25 +8,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-          clean: true  # <--- Add this line
+          clean: true 
+
       # --- 1. ALWAYS BUILD NATIVE ---
       - name: Configure CMake (Native x64)
         shell: powershell
         run: |
-          # Single line prevents syntax errors. Added /MP to allow cl.exe to use multiple cores.
-          cmake -B build_native -G "Visual Studio 17 2022" -A x64 -DCMAKE_CXX_FLAGS="/MP" -DJUCE_DIR="C:/JUCE_Installed/lib/cmake/JUCE" -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" -DCMAKE_BUILD_TYPE=Release
+          # Pointing to the exact JUCE-8.0.12 path we found earlier
+          cmake -B build_native -G "Visual Studio 17 2022" -A x64 -DCMAKE_CXX_FLAGS="/MP" -DJUCE_DIR="C:/JUCE_Installed/lib/cmake/JUCE-8.0.12" -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Native Binary
         shell: powershell
         run: |
-          # Added --parallel 8 to allow MSBuild to compile multiple targets at once
           cmake --build build_native --config Release --target Roomove_AAX --parallel 8
 
-# --- 2. THE GRACEFUL CHECK ---
+      # --- 2. THE GRACEFUL CHECK ---
       - name: Check for TI Compiler
         id: check_ti
         shell: powershell
@@ -36,53 +32,42 @@ jobs:
               Write-Host "TI Compiler found! Enabling DSP build."
               echo "DSP_ENABLED=true" >> $env:GITHUB_ENV
           } else {
-              Write-Host "##[warning] TI Compiler not found. Skipping DSP build for now. Pipeline will continue with Native only."
+              Write-Host "##[warning] TI Compiler not found. Skipping DSP..."
               echo "DSP_ENABLED=false" >> $env:GITHUB_ENV
           }
 
-
-# --- 3. BUILD DSP (THE ROBUST VERSION) ---
-      - name: Configure CMake (DSP)
+      # --- 3. BUILD DSP ---
+      - name: Configure & Build DSP
         if: env.DSP_ENABLED == 'true'
         shell: cmd
         run: |
+          :: We keep Configure and Build in ONE step to ensure the vcvars environment stays alive
           if exist build_dsp rmdir /s /q build_dsp
-          
           call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
           
+          echo --- Starting DSP Configure ---
           cmake -B build_dsp -G "NMake Makefiles" -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" -DTI_CGT_DIR="C:/TI/c6000_7.4.24" -DAAX_DSP_TYPE=HDX -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build DSP Binary
-        if: env.DSP_ENABLED == 'true'
-        shell: cmd
-        run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-          cmake --build build_dsp --config Release --target Roomove_DSP
-      - name: Build DSP Binary
-        if: env.DSP_ENABLED == 'true'
-        shell: powershell
-        run: |
-          # Must initialize vcvars here too so nmake is available to the build command
-          & "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          
+          echo --- Starting DSP Build ---
           cmake --build build_dsp --config Release --target Roomove_DSP
 
-      - name: Strip Debug Symbols (TI Toolset)
+      - name: Strip & Inject DSP
         if: env.DSP_ENABLED == 'true'
         shell: powershell
         run: |
-          & "C:\TI\c6000_7.4.24\bin\strip6x.exe" build_dsp/Roomove_DSP.so
-
-      - name: Inject DSP and Page Tables into AAX Bundle
-        if: env.DSP_ENABLED == 'true'
-        shell: powershell
-        run: |
+          # Use the actual .a file generated for the DSP target
+          $DSP_Source = "build_dsp/libRoomove_DSP.a"
           $Bundle_Dest = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin/Contents/Resources/"
+          
           if (!(Test-Path $Bundle_Dest)) { New-Item -ItemType Directory -Force -Path $Bundle_Dest }
-          # 1. Inject the DSP Binary
-          Copy-Item -Path "build_dsp/Roomove_DSP.so" -Destination $Bundle_Dest -Force
-          # 2. Inject the Page Table XML
+          
+          # 1. Strip the binary (optional but recommended for production)
+          & "C:\TI\c6000_7.4.24\bin\strip6x.exe" $DSP_Source -o "build_dsp/Roomove_DSP.stripped"
+          
+          # 2. Inject into Bundle
+          Copy-Item -Path "build_dsp/Roomove_DSP.stripped" -Destination "${Bundle_Dest}Roomove_DSP.a" -Force
           Copy-Item -Path "Resources/Roomove_PageTable.xml" -Destination $Bundle_Dest -Force
-          Write-Host "DSP binary and Page Table successfully injected."
+          Write-Host "DSP successfully injected."
 
       # --- 4. DEPLOYMENT ---
       - name: Deploy to Local Plug-Ins Folder
@@ -90,15 +75,6 @@ jobs:
         run: |
           $Source = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin"
           $Dest = "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\Roomove.aaxplugin"
-          
-          # Clean up old version
           if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
-          
-          # Deploy new build
           Copy-Item -Path $Source -Destination $Dest -Recurse -Force
-          
-          if ($env:DSP_ENABLED -eq 'true') {
-              Write-Host "SUCCESS: Hybrid Native + DSP Roomove deployed."
-          } else {
-              Write-Host "SUCCESS: Native-only Roomove deployed."
-          }
+          Write-Host "Deployment Complete."
