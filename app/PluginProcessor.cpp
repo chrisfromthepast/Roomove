@@ -64,7 +64,7 @@ void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
         }
 
         // 2. Apply Mask (Zero Latency path - safe for both Native and DSP)
-        channelData[i] *= juce::jmap (armorStrength, 1.0f, currentMask);
+        channelData[i] *= juce::jmap (armorStrength, 0.0f, 1.0f, 1.0f, currentMask);
     }
 
     // 3. Hide the background thread trigger from the TI compiler

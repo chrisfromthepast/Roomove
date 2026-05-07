@@ -34,7 +34,7 @@
             <PageTable type='BkSF' pgsz='16'>
                 <Page num='1'>
                     <ID>armor_strength</ID>
-                    <ID> </ID>
+                    <ID/>
                 </Page>
             </PageTable>
             <PageTable type='PgTL' pgsz='1'>
