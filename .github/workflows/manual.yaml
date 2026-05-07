@@ -8,7 +8,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          clean: true  # <--- Add this line
       # --- 1. ALWAYS BUILD NATIVE ---
       - name: Configure CMake (Native x64)
         shell: powershell
