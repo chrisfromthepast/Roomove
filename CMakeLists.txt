@@ -23,8 +23,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
     )
     
     # The DSP compiler still needs to know where the AAX SDK headers are
-  set(AAX_SDK_PATH "C:/SDKs/AAX-SDK") 
-  juce_set_aax_sdk_path("${AAX_SDK_PATH}")
+    set(AAX_SDK_PATH "C:/SDKs/AAX-SDK")
     target_include_directories(Roomove_DSP PRIVATE ${AAX_SDK_PATH}/Interfaces)
 
 else()
