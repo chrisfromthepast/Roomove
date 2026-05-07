@@ -1,5 +1,5 @@
 name: Build and Deploy Locally
-on: [push]
+on: [workflow_dispatch]
 
 jobs:
   build-and-deploy:
@@ -10,24 +10,74 @@ jobs:
         with:
           submodules: true
 
-      - name: Configure CMake
+      # --- 1. ALWAYS BUILD NATIVE ---
+      - name: Configure CMake (Native x64)
         run: |
-          cmake -B build -G "Visual Studio 17 2022" -A x64 `
+          cmake -B build_native -G "Visual Studio 17 2022" -A x64 `
           -DAAX_SDK_PATH="C:/SDKs/aax-sdk" `
           -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build AAX Binary
-        run: cmake --build build --config Release --target Roomove_AAX
+      - name: Build Native Binary
+        run: cmake --build build_native --config Release --target Roomove_AAX
 
+      # --- 2. THE GRACEFUL CHECK ---
+      - name: Check for TI Compiler
+        id: check_ti
+        shell: powershell
+        run: |
+          # UPDATE THIS ONCE YOUR DOWNLOAD FINISHES
+          $TI_Path = "C:\ti\c6000_7.4.24" 
+          
+          if (Test-Path $TI_Path) {
+              Write-Host "TI Compiler found at $TI_Path. Enabling DSP build."
+              echo "DSP_ENABLED=true" >> $env:GITHUB_ENV
+          } else {
+              Write-Host "##[warning] TI Compiler not found at $TI_Path. Skipping DSP build for now. Pipeline will continue with Native only."
+              echo "DSP_ENABLED=false" >> $env:GITHUB_ENV
+          }
+
+      # --- 3. BUILD DSP (ONLY IF READY) ---
+      - name: Configure CMake (DSP)
+        if: env.DSP_ENABLED == 'true'
+        run: |
+          # Note: Requires Ninja or NMake generator for TI cross-compilation
+          cmake -B build_dsp -G "Ninja" `
+          -DCMAKE_TOOLCHAIN_FILE="path/to/your/ti_toolchain.cmake" `
+          -DAAX_SDK_PATH="C:/SDKs/aax-sdk" `
+          -DTI_CGT_DIR="C:/ti/cgt_version_here" `
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build DSP Binary
+        if: env.DSP_ENABLED == 'true'
+        run: cmake --build build_dsp --config Release --target Roomove_DSP
+
+      - name: Inject DSP into AAX Bundle
+        if: env.DSP_ENABLED == 'true'
+        shell: powershell
+        run: |
+          # Merges the TI binary into the Pro Tools plugin folder structure
+          $DSP_Source = "build_dsp/Roomove_DSP.so" # Adjust extension based on CMake output
+          $DSP_Dest = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin/Contents/DSP/"
+          
+          New-Item -ItemType Directory -Force -Path $DSP_Dest
+          Copy-Item -Path $DSP_Source -Destination $DSP_Dest -Force
+          Write-Host "DSP binary successfully injected into the AAX bundle."
+
+      # --- 4. DEPLOYMENT ---
       - name: Deploy to Local Plug-Ins Folder
         shell: powershell
         run: |
-          $Source = "build/Roomove_artefacts/Release/AAX/Roomove.aaxplugin"
+          $Source = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin"
           $Dest = "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\Roomove.aaxplugin"
           
-          # Clean up old version if it exists
+          # Clean up old version
           if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
           
-          # Copy the new build
+          # Deploy new build
           Copy-Item -Path $Source -Destination $Dest -Recurse -Force
-          Write-Host "Roomove deployed to local Plug-Ins folder."
+          
+          if ($env:DSP_ENABLED -eq 'true') {
+              Write-Host "SUCCESS: Hybrid Native + DSP Roomove deployed."
+          } else {
+              Write-Host "SUCCESS: Native-only Roomove deployed."
+          }
