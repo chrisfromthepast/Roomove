@@ -46,48 +46,32 @@ void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
 
 
 
-const juce::String RoomoveAudioProcessor::getName() const { return JucePlugin_Name; }
+const juce::String ArmorAudioProcessor::getName() const { return JucePlugin_Name; }
 
-bool RoomoveAudioProcessor::acceptsMidi() const  { return false; }
-bool RoomoveAudioProcessor::producesMidi() const { return false; }
-bool RoomoveAudioProcessor::isMidiEffect() const { return false; }
-double RoomoveAudioProcessor::getTailLengthSeconds() const { return 0.0; }
+bool ArmorAudioProcessor::acceptsMidi() const  { return false; }
+bool ArmorAudioProcessor::producesMidi() const { return false; }
+bool ArmorAudioProcessor::isMidiEffect() const { return false; }
+double ArmorAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
-int RoomoveAudioProcessor::getNumPrograms()                                    { return 1; }
-int RoomoveAudioProcessor::getCurrentProgram()                                 { return 0; }
-void RoomoveAudioProcessor::setCurrentProgram (int)                            {}
-const juce::String RoomoveAudioProcessor::getProgramName (int)                 { return {}; }
-void RoomoveAudioProcessor::changeProgramName (int, const juce::String&)       {}
+int ArmorAudioProcessor::getNumPrograms()                                    { return 1; }
+int ArmorAudioProcessor::getCurrentProgram()                                 { return 0; }
+void ArmorAudioProcessor::setCurrentProgram (int)                            {}
+const juce::String ArmorAudioProcessor::getProgramName (int)                 { return {}; }
+void ArmorAudioProcessor::changeProgramName (int, const juce::String&)       {}
 
-void RoomoveAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
-{
-    juce::ignoreUnused (sampleRate, samplesPerBlock);
-}
+void ArmorAudioProcessor::releaseResources() {}
 
-void RoomoveAudioProcessor::releaseResources() {}
+bool ArmorAudioProcessor::hasEditor() const { return false; }
 
-void RoomoveAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
-                                          juce::MidiBuffer& midiMessages)
-{
-    juce::ignoreUnused (midiMessages);
-    juce::ScopedNoDenormals noDenormals;
-
-    for (int channel = getTotalNumInputChannels();
-         channel < getTotalNumOutputChannels(); ++channel)
-        buffer.clear (channel, 0, buffer.getNumSamples());
-}
-
-bool RoomoveAudioProcessor::hasEditor() const { return false; }
-
-juce::AudioProcessorEditor* RoomoveAudioProcessor::createEditor()
+juce::AudioProcessorEditor* ArmorAudioProcessor::createEditor()
 {
     return nullptr;
 }
 
-void RoomoveAudioProcessor::getStateInformation (juce::MemoryBlock&) {}
-void RoomoveAudioProcessor::setStateInformation (const void*, int) {}
+void ArmorAudioProcessor::getStateInformation (juce::MemoryBlock&) {}
+void ArmorAudioProcessor::setStateInformation (const void*, int) {}
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new RoomoveAudioProcessor();
+    return new ArmorAudioProcessor();
 }
