@@ -6,16 +6,7 @@ void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     sidechainBuffer.setSize(1, 512); 
     fifo.reset();
 
-    // 2. Hide the weights loading and model reset from the TI compiler
-#ifndef __TMS320C6X__
-    auto modelData = BinaryData::subtractor_onnx;
-    auto modelSize = BinaryData::subtractor_onnxSize;
-    
-    std::stringstream ss;
-    ss.write(modelData, modelSize);
-    model = RTNeural::json_parser::parseJson<float>(ss);
-    model->reset();
-#endif
+    // 2. Keep RTNeural setup out of builds that cannot compile it
 }
 
 void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
@@ -38,8 +29,8 @@ void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     }
 
     // 3. Hide the background thread trigger from the TI compiler
-#ifndef __TMS320C6X__
-    // Trigger background inference here
+#if ROOMOVE_HAS_RTNEURAL
+    // Trigger background inference here when the RTNeural path is available
 #endif
 }
 
