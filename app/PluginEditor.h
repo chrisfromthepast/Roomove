@@ -5,7 +5,7 @@
 class RoomoveAudioEditor : public juce::AudioProcessorEditor, public juce::Timer
 {
 public:
-    RoomoveAudioEditor (RoomoveAudioProcessor&);
+    RoomoveAudioEditor (ArmorAudioProcessor&);
     ~RoomoveAudioEditor() override;
 
     void paint (juce::Graphics&) override;
@@ -13,7 +13,7 @@ public:
     void timerCallback() override;
 
 private:
-    RoomoveAudioProcessor& audioProcessor;
+    ArmorAudioProcessor& audioProcessor;
 
     // 1. Intensity knob
     juce::Slider intensityKnob;

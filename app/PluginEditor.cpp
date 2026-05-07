@@ -1,7 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-RoomoveAudioEditor::RoomoveAudioEditor (RoomoveAudioProcessor& p)
+RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
     // -- Intensity Knob --
