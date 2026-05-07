@@ -16,10 +16,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
     
     # Define the raw DSP algorithm here. 
     # NOTE: You CANNOT use PluginProcessor.cpp or JUCE here!
-    # You will need a separate bare-metal C++ file for the DSP side.
-    add_library(Roomove_DSP SHARED
-        # TODO: Add your pure-C++ DSP algorithm file here once you create it
-        # For example: dsp/RoomoveDSP.cpp
+# Define the raw DSP algorithm here as a STATIC library
+    # to satisfy the bare-metal TI compiler environment.
+    add_library(Roomove_DSP STATIC
+        dsp/RoomoveDSP.cpp
     )
     
     # The DSP compiler still needs to know where the AAX SDK headers are
