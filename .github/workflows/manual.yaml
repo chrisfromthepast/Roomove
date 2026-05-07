@@ -60,19 +60,21 @@ jobs:
           # Uses the TI 'strip6x' tool to optimize the binary size for S6L memory
           & "C:\TI\c6000_7.4.24\bin\strip6x.exe" build_dsp/Roomove_DSP.so
 
-      - name: Inject DSP into AAX Bundle
+      - name: Inject DSP and Page Tables into AAX Bundle
         if: env.DSP_ENABLED == 'true'
         shell: powershell
         run: |
-          # 1. Define the internal Avid-spec directory structure
-          $DSP_Dest = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin/Contents/Resources/"
-          
-          # 2. Ensure the destination exists (S6L looks specifically in Resources or DSP folders)
-          if (!(Test-Path $DSP_Dest)) { New-Item -ItemType Directory -Force -Path $DSP_Dest }
-          
-          # 3. Copy the TI binary
-          Copy-Item -Path "build_dsp/Roomove_DSP.so" -Destination $DSP_Dest -Force
-          Write-Host "DSP binary stripped and injected into AAX bundle."
+          $Bundle_Dest = "build_native/Roomove_artefacts/Release/AAX/Roomove.aaxplugin/Contents/Resources/"
+
+          if (!(Test-Path $Bundle_Dest)) { New-Item -ItemType Directory -Force -Path $Bundle_Dest }
+
+          # 1. Inject the DSP Binary
+          Copy-Item -Path "build_dsp/Roomove_DSP.so" -Destination $Bundle_Dest -Force
+
+          # 2. Inject the Page Table XML (Crucial for S6L surface visibility)
+          Copy-Item -Path "Resources/Roomove_PageTable.xml" -Destination $Bundle_Dest -Force
+
+          Write-Host "DSP binary and Page Table successfully injected."
       # --- 4. DEPLOYMENT ---
       - name: Deploy to Local Plug-Ins Folder
         shell: powershell

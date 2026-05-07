@@ -1,0 +1,53 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+<PageTables vers='6.4.0.89'>
+    <PageTableLayouts>
+        <Plugin manID='Cftp' prodID='Rmov' plugID='Rmov'>
+            <Desc>Roomove</Desc>
+            <Layout>StandardLayout</Layout>
+        </Plugin>
+        <PTLayout name='StandardLayout'>
+            <PageTable type='Av18' pgsz='24'>
+                <Page num='1'>
+                    <Cell row='1' col='1' knobID='armor_strength' inOutButtonID='' selectButtonID=''/>
+                    <Cell row='1' col='2' knobID='' inOutButtonID='' selectButtonID=''/>
+                    <Cell row='1' col='3' knobID='' inOutButtonID='' selectButtonID=''/>
+                    <Cell row='1' col='4' knobID='' inOutButtonID='' selectButtonID=''/>
+                    <Cell row='1' col='5' knobID='' inOutButtonID='' selectButtonID=''/>
+                    <Cell row='1' col='6' knobID='' inOutButtonID='' selectButtonID=''/>
+                    <Cell row='1' col='7' knobID='' inOutButtonID='' selectButtonID=''/>
+                    <Cell row='1' col='8' knobID='' inOutButtonID='' selectButtonID=''/>
+                </Page>
+                <FirstPg cat='0'>0</FirstPg>
+                <FirstPg cat='1'>0</FirstPg>
+                <FirstPg cat='2'>0</FirstPg>
+                <FirstPg cat='4'>0</FirstPg>
+                <FirstPg cat='8'>0</FirstPg>
+                <FirstPg cat='16'>0</FirstPg>
+                <FirstPg cat='32'>0</FirstPg>
+                <FirstPg cat='64'>0</FirstPg>
+                <FirstPg cat='128'>0</FirstPg>
+                <FirstPg cat='256'>0</FirstPg>
+                <FirstPg cat='512'>0</FirstPg>
+                <FirstPg cat='1024'>0</FirstPg>
+                <FirstPg cat='2048'>0</FirstPg>
+            </PageTable>
+            <PageTable type='BkSF' pgsz='16'>
+                <Page num='1'>
+                    <ID>armor_strength</ID>
+                    <ID/>
+                </Page>
+            </PageTable>
+            <PageTable type='PgTL' pgsz='1'>
+                <Page num='1'>
+                    <ID>armor_strength</ID>
+                </Page>
+            </PageTable>
+        </PTLayout>
+    </PageTableLayouts>
+    <ControlNamesVariations>
+        <Ctrl ID='armor_strength'>
+            <name typ='PgTL' sz='5'>Armor</name>
+            <name typ='PgTL' sz='14'>Armor Strength</name>
+        </Ctrl>
+    </ControlNamesVariations>
+</PageTables>

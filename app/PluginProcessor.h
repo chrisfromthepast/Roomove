@@ -12,6 +12,9 @@
 class ArmorAudioProcessor : public juce::AudioProcessor
 {
 public:
+    ArmorAudioProcessor();
+    ~ArmorAudioProcessor() override = default;
+
     const juce::String getName() const override;
 
     bool acceptsMidi() const override;
@@ -35,6 +38,10 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    juce::AudioProcessorValueTreeState apvts;
+
 private:
 #if ROOMOVE_HAS_RTNEURAL
     std::unique_ptr<RTNeural::ModelT<float, 1, 1>> model;
@@ -43,6 +50,7 @@ private:
     juce::AbstractFifo fifo { 1024 };
     float maskBuffer[1024];
     float currentMask = 1.0f;
+    std::atomic<float>* armorStrengthValue = nullptr;
 
 #if ROOMOVE_HAS_RTNEURAL
     void runInference();
