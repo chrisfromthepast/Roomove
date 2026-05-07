@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "PluginEditor.h"
 
 namespace
 {
@@ -84,11 +85,11 @@ void ArmorAudioProcessor::changeProgramName (int, const juce::String&)       {}
 
 void ArmorAudioProcessor::releaseResources() {}
 
-bool ArmorAudioProcessor::hasEditor() const { return false; }
+bool ArmorAudioProcessor::hasEditor() const { return true; }
 
 juce::AudioProcessorEditor* ArmorAudioProcessor::createEditor()
 {
-    return nullptr;
+    return new RoomoveAudioEditor (*this);
 }
 
 void ArmorAudioProcessor::getStateInformation (juce::MemoryBlock& destData)

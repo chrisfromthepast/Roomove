@@ -77,6 +77,8 @@ else()
 
     target_sources(Roomove_AAX
         PRIVATE
+            app/PluginEditor.cpp
+            app/PluginEditor.h
             app/PluginProcessor.cpp
             app/PluginProcessor.h
     )
