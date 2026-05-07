@@ -6,10 +6,7 @@ void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     sidechainBuffer.setSize(1, 512); 
     fifo.reset();
 
-    // 2. Hide the native-only model setup from the TI compiler
-#if ROOMOVE_HAS_RTNEURAL
-    model.reset();
-#endif
+    // 2. Keep RTNeural setup out of builds that cannot compile it
 }
 
 void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
