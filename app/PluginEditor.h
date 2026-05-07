@@ -29,8 +29,8 @@ public:
 
 private:
     MachinedFaderLookAndFeel machinedLookAndFeel;
-    juce::Slider roomSlider;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> roomAttachment;
+    juce::Slider armorStrengthFader;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> strengthAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RoomoveAudioEditor)
 };

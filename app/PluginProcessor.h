@@ -9,6 +9,11 @@
     #define ROOMOVE_HAS_RTNEURAL 0
 #endif
 
+namespace RoomoveParameterIds
+{
+    inline constexpr auto armorStrength = "armor_strength";
+}
+
 class ArmorAudioProcessor : public juce::AudioProcessor
 {
 public:

@@ -3,7 +3,6 @@
 
 namespace
 {
-    constexpr auto armorStrengthParameterId = "armor_strength";
     constexpr auto armorStrengthParameterName = "Armor Strength";
     constexpr auto armorStrengthParameterVersion = 1;
 }
@@ -14,7 +13,7 @@ ArmorAudioProcessor::ArmorAudioProcessor()
         .withOutput ("Output", juce::AudioChannelSet::mono(), true)),
       apvts (*this, nullptr, "Parameters", createParameterLayout())
 {
-    armorStrengthValue = apvts.getRawParameterValue (armorStrengthParameterId);
+    armorStrengthValue = apvts.getRawParameterValue (RoomoveParameterIds::armorStrength);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ArmorAudioProcessor::createParameterLayout()
@@ -22,7 +21,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ArmorAudioProcessor::createP
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> parameters;
 
     parameters.push_back (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID { armorStrengthParameterId, armorStrengthParameterVersion },
+        juce::ParameterID { RoomoveParameterIds::armorStrength, armorStrengthParameterVersion },
         armorStrengthParameterName,
         juce::NormalisableRange<float> { 0.0f, 1.0f, 0.01f },
         1.0f));

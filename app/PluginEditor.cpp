@@ -23,7 +23,8 @@ void MachinedFaderLookAndFeel::drawLinearSlider (juce::Graphics& g,
     const auto faderWidth = (float) width * 0.8f;
     constexpr auto faderHeight = 60.0f;
     const auto faderX = (float) x + ((float) width - faderWidth) * 0.5f;
-    const auto faderY = sliderPos - (faderHeight * 0.5f);
+    const auto unclampedFaderY = sliderPos - (faderHeight * 0.5f);
+    const auto faderY = juce::jlimit ((float) y, (float) y + (float) height - faderHeight, unclampedFaderY);
 
     const juce::Colour gradientStart (0xff323232);
     const juce::Colour gradientEnd (0xff1a1a1a);
@@ -46,12 +47,13 @@ void MachinedFaderLookAndFeel::drawLinearSlider (juce::Graphics& g,
     }
 
     g.setColour (juce::Colours::white.withAlpha (0.7f));
+    constexpr auto textVerticalOffset = 6.0f;
     auto font = juce::Font (12.0f, juce::Font::bold);
     font.setTypefaceName (juce::Font::getDefaultMonospacedFontName());
     g.setFont (font);
     g.drawText ("ROOM",
                 juce::Rectangle<int> ((int) std::round (faderX),
-                                      (int) std::round (faderY + (faderHeight * 0.5f) - 6.0f),
+                                      (int) std::round (faderY + (faderHeight * 0.5f) - textVerticalOffset),
                                       (int) std::round (faderWidth),
                                       12),
                 juce::Justification::centred);
@@ -62,18 +64,18 @@ RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& p)
 {
     setSize (150, 400);
 
-    roomSlider.setSliderStyle (juce::Slider::LinearVertical);
-    roomSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-    roomSlider.setLookAndFeel (&machinedLookAndFeel);
-    addAndMakeVisible (roomSlider);
+    armorStrengthFader.setSliderStyle (juce::Slider::LinearVertical);
+    armorStrengthFader.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    armorStrengthFader.setLookAndFeel (&machinedLookAndFeel);
+    addAndMakeVisible (armorStrengthFader);
 
-    roomAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
-        p.apvts, "armor_strength", roomSlider);
+    strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        p.apvts, RoomoveParameterIds::armorStrength, armorStrengthFader);
 }
 
 RoomoveAudioEditor::~RoomoveAudioEditor()
 {
-    roomSlider.setLookAndFeel (nullptr);
+    armorStrengthFader.setLookAndFeel (nullptr);
 }
 
 void RoomoveAudioEditor::paint (juce::Graphics& g)
@@ -85,5 +87,5 @@ void RoomoveAudioEditor::paint (juce::Graphics& g)
 
 void RoomoveAudioEditor::resized()
 {
-    roomSlider.setBounds (getLocalBounds().reduced (20, 40));
+    armorStrengthFader.setBounds (getLocalBounds().reduced (20, 40));
 }
