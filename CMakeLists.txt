@@ -34,7 +34,7 @@ juce_generate_juce_header(Roomove)
 
 target_sources(Roomove
     PRIVATE
-        app/pluginProcessor.cpp
+        app/PluginProcessor.cpp
         app/PluginProcessor.h
 )
 
