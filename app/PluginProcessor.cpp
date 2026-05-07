@@ -1,13 +1,50 @@
 #include "PluginProcessor.h"
 
-RoomoveAudioProcessor::RoomoveAudioProcessor()
-    : AudioProcessor (BusesProperties()
-                      .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
-                      .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
+void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    // 1. Pre-allocate EVERYTHING (Safe and required for DSP)
+    sidechainBuffer.setSize(1, 512); 
+    fifo.reset();
+
+    // 2. Hide the weights loading and model reset from the TI compiler
+#ifndef __TMS320C6X__
+    auto modelData = BinaryData::subtractor_onnx;
+    auto modelSize = BinaryData::subtractor_onnxSize;
+    
+    std::stringstream ss;
+    ss.write(modelData, modelSize);
+    model = RTNeural::json_parser::parseJson<float>(ss);
+    model->reset();
+#endif
 }
 
-RoomoveAudioProcessor::~RoomoveAudioProcessor() {}
+void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+{
+    auto* channelData = buffer.getWritePointer(0);
+
+    for (int i = 0; i < buffer.getNumSamples(); ++i)
+    {
+        // 1. Peek at the FIFO for a new mask
+        int start1, size1, start2, size2;
+        fifo.prepareToRead(1, start1, size1, start2, size2);
+        
+        if (size1 > 0) {
+            currentMask = maskBuffer[start1];
+            fifo.finishedRead(1);
+        }
+
+        // 2. Apply Mask (Zero Latency path - safe for both Native and DSP)
+        channelData[i] *= currentMask;
+    }
+
+    // 3. Hide the background thread trigger from the TI compiler
+#ifndef __TMS320C6X__
+    // Trigger background inference here
+#endif
+}
+
+
+
 
 const juce::String RoomoveAudioProcessor::getName() const { return JucePlugin_Name; }
 
