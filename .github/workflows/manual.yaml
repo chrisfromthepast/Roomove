@@ -20,7 +20,7 @@ jobs:
         run: cmake --build build --config Release --target Roomove_AAX
 
       - name: Deploy to Local Plug-Ins Folder
-        shell: pwsh
+        shell: powershell
         run: |
           $Source = "build/Roomove_artefacts/Release/AAX/Roomove.aaxplugin"
           $Dest = "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\Roomove.aaxplugin"
