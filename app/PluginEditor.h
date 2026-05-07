@@ -15,7 +15,7 @@ public:
 private:
     RoomoveAudioProcessor& audioProcessor;
 
-    // 1. Intensity Knob (Armor Strength)
+    // 1. Intensity knob
     juce::Slider armorStrengthKnob;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> strengthAttachment;
     juce::Label strengthLabel;

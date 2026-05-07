@@ -9,13 +9,13 @@ RoomoveAudioEditor::RoomoveAudioEditor (RoomoveAudioProcessor& p)
     armorStrengthKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
     addAndMakeVisible(armorStrengthKnob);
 
-    strengthLabel.setText("Armor Strength", juce::dontSendNotification);
+    strengthLabel.setText("Intensity", juce::dontSendNotification);
     strengthLabel.setJustificationType(juce::Justification::centred);
     strengthLabel.attachToComponent(&armorStrengthKnob, false);
     addAndMakeVisible(strengthLabel);
 
     // Uncomment and connect to your APVTS once created in the Processor
-    // strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "ARMOR_STRENGTH", armorStrengthKnob);
+    // strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "ROOMOVE_STRENGTH", armorStrengthKnob);
 
     // -- VU Meter --
     addAndMakeVisible(vuMeter);
