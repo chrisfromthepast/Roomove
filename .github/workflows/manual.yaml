@@ -20,8 +20,8 @@ jobs:
       - name: Build Native Binary
         shell: powershell
         run: |
-          # Removing --target forces the 'ALL' build, which triggers the JUCE bundle stitching
-          cmake --build build_native --config Release --parallel 8
+          # Use ALL_BUILD to ensure JUCE's packaging scripts run
+          cmake --build build_native --config Release --target ALL_BUILD --parallel 8
 
       # --- 2. THE GRACEFUL CHECK ---
       - name: Check for TI Compiler
