@@ -47,12 +47,11 @@ void MachinedFaderLookAndFeel::drawLinearSlider (juce::Graphics& g,
     }
 
     g.setColour (juce::Colours::white.withAlpha (0.7f));
-    auto font = juce::Font (12.0f, juce::Font::bold);
-    font.setTypefaceName (juce::Font::getDefaultMonospacedFontName());
-    g.setFont (font);
+    constexpr auto textVerticalOffset = 6.0f;
+    g.setFont (juce::Font (juce::Font::getDefaultMonospacedFontName(), 12.0f, juce::Font::bold));
     g.drawText ("ROOM",
                 juce::Rectangle<int> ((int) std::round (faderX),
-                                      (int) std::round (faderY + (faderHeight * 0.5f) - 6.0f),
+                                      (int) std::round (faderY + (faderHeight * 0.5f) - textVerticalOffset),
                                       (int) std::round (faderWidth),
                                       12),
                 juce::Justification::centred);
