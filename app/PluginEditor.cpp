@@ -5,17 +5,20 @@ RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
     // -- Intensity Knob --
-    intensityKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    intensityKnob.setLookAndFeel(&machinedFaderLookAndFeel);
+    intensityKnob.setSliderStyle(juce::Slider::LinearVertical);
     intensityKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
     addAndMakeVisible(intensityKnob);
 
-    strengthLabel.setText("Intensity", juce::dontSendNotification);
+    strengthLabel.setText("Armor Strength", juce::dontSendNotification);
     strengthLabel.setJustificationType(juce::Justification::centred);
     strengthLabel.attachToComponent(&intensityKnob, false);
     addAndMakeVisible(strengthLabel);
 
-    // Uncomment and connect to your APVTS once created in the Processor
-    // strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "ROOMOVE_STRENGTH", intensityKnob);
+    strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.apvts,
+        RoomoveParameterIds::armorStrength,
+        intensityKnob);
 
     // -- VU Meter --
     addAndMakeVisible(vuMeter);
@@ -33,10 +36,13 @@ RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& p)
 
     // Window size and UI polling rate
     setSize (400, 350);
-    startTimerHz(30); 
+    startTimerHz(30);
 }
 
-RoomoveAudioEditor::~RoomoveAudioEditor() {}
+RoomoveAudioEditor::~RoomoveAudioEditor()
+{
+    intensityKnob.setLookAndFeel(nullptr);
+}
 
 void RoomoveAudioEditor::paint (juce::Graphics& g)
 {
