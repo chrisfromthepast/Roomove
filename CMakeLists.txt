@@ -2,21 +2,31 @@ cmake_minimum_required(VERSION 3.22)
 
 project(Roomove VERSION 0.1.0)
 
-# 1. Check if the local directory exists
-if(EXISTS "C:/JUCE/CMakeLists.txt")
-    message(STATUS "SUCCESS: Using local JUCE source at C:/JUCE")
+# --- JUCE TRIPLE-CHECK LOGIC ---
+
+# 1. CHECK FOR "BAKED" INSTALL (Fastest - seconds)
+find_package(JUCE CONFIG QUIET PATHS "C:/JUCE_Installed")
+
+if(JUCE_FOUND)
+    message(STATUS "SUCCESS: Using Pre-Built JUCE at ${JUCE_DIR}")
+    set(JUCE_BUILD_HELPER_TOOLS OFF CACHE BOOL "" FORCE)
+
+# 2. CHECK FOR LOCAL SOURCE (Medium - minutes)
+elseif(EXISTS "C:/JUCE/CMakeLists.txt")
+    message(STATUS "NOTICE: Pre-Built JUCE not found. Building from local source at C:/JUCE...")
     add_subdirectory("C:/JUCE" JUCE)
+
+# 3. CLOUD FALLBACK (Slowest - "The Glacier")
 else()
-    message(STATUS "WARNING: Local JUCE folder not found. Falling back to FetchContent...")
+    message(STATUS "WARNING: No local JUCE found. Downloading from GitHub...")
     include(FetchContent)
     FetchContent_Declare(
         JUCE
         GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-        GIT_TAG        7.0.9
+        GIT_TAG        7.0.9 # Or your preferred version
     )
     FetchContent_MakeAvailable(JUCE)
 endif()
-
 # Point to the AAX SDK
 # Hardcoded paths for local S6L AAX DSP build
 set(AAX_SDK_PATH "C:/SDKs/AAX-SDK") 
