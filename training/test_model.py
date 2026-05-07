@@ -3,7 +3,7 @@ import torch
 import torchaudio
 import csv
 import random
-from train import SubtractorNet # Import your model class
+from training.train import SubtractorNet # Import your model class
 
 # --- Configuration ---
 DATA_DIR = './paired_room_data'

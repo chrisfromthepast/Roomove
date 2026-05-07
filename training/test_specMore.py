@@ -18,7 +18,7 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.ba
 
 def run_spec_test():
     # 1. Load Model
-    from spectroTrainMore import SpecUNet
+    from training.spectroTrainMore import SpecUNet
     model = SpecUNet().to(DEVICE)
     if os.path.exists(MODEL_PATH):
         model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
