@@ -69,7 +69,7 @@ jobs:
         run: |
           # Path logic for JUCE 8 AAX artifacts
           $Artifacts_Root = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin"
-          $Win64_Bin = "$Artifacts_Root/Contents/Win64/Roomove.aaxplugin"
+          $Win64_Bin = "$Artifacts_Root/Contents/x64/Roomove.aaxplugin"
           $Bundle_Res = "$Artifacts_Root/Contents/Resources/"
 
           # THE CRITICAL HOLLOW BUNDLE CHECK
