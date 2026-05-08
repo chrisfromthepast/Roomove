@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$BuildDspDir = "build_dsp",
     [Parameter(Mandatory = $false)]
-    [string]$DspEnabled = ""
+    [string]$DspEnabled = $null
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,7 +55,7 @@ try {
         New-Item -ItemType Directory -Force -Path $ResDir | Out-Null
     }
 
-    if ($DspEnabled -eq "") {
+    if ($null -eq $DspEnabled -or $DspEnabled -eq "") {
         $DspEnabled = $env:DSP_ENABLED
     }
 
@@ -63,12 +63,16 @@ try {
     if ($DspEnabled -eq "true" -and (Test-Path $DspLib)) {
         Copy-Item -Path $DspLib -Destination (Join-Path $ResDir "Roomove_DSP.a") -Force
         Write-Host "DSP Injected."
+    } elseif ($DspEnabled -eq "true") {
+        Write-Host "##[warning] DSP is enabled but '$DspLib' was not found. Skipping DSP injection."
     }
 
     $PageTable = "Resources/Roomove_PageTable.xml"
     if (Test-Path $PageTable) {
         Copy-Item -Path $PageTable -Destination $ResDir -Force
         Write-Host "Page Table Injected."
+    } else {
+        Write-Host "##[warning] Page table '$PageTable' not found. S6L page-table injection skipped."
     }
 
     Write-Host "Verification and injection completed for $BundlePath"
