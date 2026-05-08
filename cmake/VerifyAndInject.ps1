@@ -4,6 +4,10 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$BuildDspDir = "build_dsp",
     [Parameter(Mandatory = $false)]
+    [string]$DspLibraryName = "libRoomove_DSP.a",
+    [Parameter(Mandatory = $false)]
+    [string]$PageTablePath = "Resources/Roomove_PageTable.xml",
+    [Parameter(Mandatory = $false)]
     [string]$DspEnabled = $null
 )
 
@@ -59,7 +63,7 @@ try {
         $DspEnabled = $env:DSP_ENABLED
     }
 
-    $DspLib = Join-Path $BuildDspDir "libRoomove_DSP.a"
+    $DspLib = Join-Path $BuildDspDir $DspLibraryName
     if ($DspEnabled -eq "true" -and (Test-Path $DspLib)) {
         Copy-Item -Path $DspLib -Destination (Join-Path $ResDir "Roomove_DSP.a") -Force
         Write-Host "DSP Injected."
@@ -67,12 +71,11 @@ try {
         Write-Host "##[warning] DSP is enabled but '$DspLib' was not found. Skipping DSP injection."
     }
 
-    $PageTable = "Resources/Roomove_PageTable.xml"
-    if (Test-Path $PageTable) {
-        Copy-Item -Path $PageTable -Destination $ResDir -Force
+    if (Test-Path $PageTablePath) {
+        Copy-Item -Path $PageTablePath -Destination $ResDir -Force
         Write-Host "Page Table Injected."
     } else {
-        Write-Host "##[warning] Page table '$PageTable' not found. S6L page-table injection skipped."
+        Write-Host "##[warning] Page table '$PageTablePath' not found. S6L page-table injection skipped."
     }
 
     Write-Host "Verification and injection completed for $BundlePath"

@@ -103,7 +103,7 @@ juce_add_plugin(Roomove_AAX
 
     if(WIN32)
         add_custom_target(Roomove_Verify_And_Inject
-            COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File "${CMAKE_SOURCE_DIR}/cmake/VerifyAndInject.ps1" -BuildNativeDir "build_native" -BuildDspDir "build_dsp" -DspEnabled "$ENV{DSP_ENABLED}"
+            COMMAND powershell -NoProfile -ExecutionPolicy Bypass -File "${CMAKE_SOURCE_DIR}/cmake/VerifyAndInject.ps1" -BuildNativeDir "${CMAKE_BINARY_DIR}" -BuildDspDir "${CMAKE_SOURCE_DIR}/build_dsp" -DspLibraryName "libRoomove_DSP.a" -PageTablePath "${CMAKE_SOURCE_DIR}/Resources/Roomove_PageTable.xml" -DspEnabled "$ENV{DSP_ENABLED}"
             WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
             COMMENT "Verify AAX bundle and inject DSP/Page Table resources"
             VERBATIM
