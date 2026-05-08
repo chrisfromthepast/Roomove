@@ -65,34 +65,9 @@ jobs:
 
       # --- 3. THE "STITCH" & INJECTION ---
       - name: Verify and Inject
-        shell: powershell
+        shell: cmd
         run: |
-          # Path logic for JUCE 8 AAX artifacts
-          $Artifacts_Root = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin"
-          $Win64_Bin = "$Artifacts_Root/Contents/x64/Roomove.aaxplugin"
-          $Bundle_Res = "$Artifacts_Root/Contents/Resources/"
-
-          # THE CRITICAL HOLLOW BUNDLE CHECK
-          if (!(Test-Path $Win64_Bin)) {
-              Write-Error "CRITICAL FAILURE: Native binary missing at $Win64_Bin. Packaging failed!"
-              exit 1
-          }
-
-          if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res }
-
-          # Inject DSP Binary if it was built
-          if ("${{ env.DSP_ENABLED }}" -eq "true") {
-              if (Test-Path "build_dsp/libRoomove_DSP.a") {
-                  Copy-Item -Path "build_dsp/libRoomove_DSP.a" -Destination "${Bundle_Res}Roomove_DSP.a" -Force
-                  Write-Host "DSP Binary Injected."
-              }
-          }
-
-          # Inject Page Table (Critical for S6L)
-          if (Test-Path "Resources/Roomove_PageTable.xml") {
-              Copy-Item -Path "Resources/Roomove_PageTable.xml" -Destination $Bundle_Res -Force
-              Write-Host "Page Table Injected."
-          }
+          cmake --build build_native --config Release --target Roomove_Verify_And_Inject --parallel 8
 
       # --- 4. DEPLOYMENT ---
       - name: Deploy to Pro Tools
