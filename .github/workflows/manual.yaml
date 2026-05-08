@@ -1,5 +1,7 @@
-name: Build and Deploy Locally
-on: [workflow_dispatch]
+name: Build and Deploy Roomove
+on:
+  workflow_dispatch: # Allows manual trigger from the Actions tab
+
 jobs:
   build-and-deploy:
     runs-on: self-hosted
@@ -8,21 +10,33 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-          clean: true 
+          clean: true
 
-      # --- 1. ALWAYS BUILD NATIVE ---
-      - name: Configure CMake (Native x64)
+      - name: Clean Previous Builds
         shell: powershell
         run: |
-          # Pointing to the exact JUCE-8.0.12 path we found earlier
-          cmake -B build_native -G "Visual Studio 17 2022" -A x64 -DCMAKE_CXX_FLAGS="/MP" -DJUCE_DIR="C:/JUCE_Installed/lib/cmake/JUCE-8.0.12" -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" -DCMAKE_BUILD_TYPE=Release
+          if (Test-Path build_native) { Remove-Item -Recurse -Force build_native }
+          if (Test-Path build_dsp) { Remove-Item -Recurse -Force build_dsp }
 
-      - name: Build Native Binary
+      # --- 1. NATIVE BUILD (MSVC + JUCE) ---
+      - name: Configure Native (x64)
         shell: powershell
         run: |
-          # Use ALL_BUILD to trigger the JUCE packaging/stitching script
+          # JUCE_DIR points to the 8.0.12 install we verified earlier
+          cmake -B build_native -G "Visual Studio 17 2022" -A x64 `
+            -DJUCE_DIR="C:/JUCE_Installed/lib/cmake/JUCE-8.0.12" `
+            -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build and Package AAX
+        shell: cmd
+        run: |
+          :: Build the shared code first
           cmake --build build_native --config Release --target ALL_BUILD --parallel 8
-      # --- 2. THE GRACEFUL CHECK ---
+          :: Force the JUCE stitching/packaging tool to run
+          cmake --build build_native --config Release --target Roomove_AAX_AAX --parallel 8
+
+      # --- 2. DSP BUILD (TI COMPILER) ---
       - name: Check for TI Compiler
         id: check_ti
         shell: powershell
@@ -36,63 +50,68 @@ jobs:
               echo "DSP_ENABLED=false" >> $env:GITHUB_ENV
           }
 
-      # --- 3. BUILD DSP ---
       - name: Configure & Build DSP
         if: env.DSP_ENABLED == 'true'
         shell: cmd
         run: |
-          :: We keep Configure and Build in ONE step to ensure the vcvars environment stays alive
-          if exist build_dsp rmdir /s /q build_dsp
           call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-          
-          echo --- Starting DSP Configure ---
-          cmake -B build_dsp -G "NMake Makefiles" -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" -DTI_CGT_DIR="C:/TI/c6000_7.4.24" -DAAX_DSP_TYPE=HDX -DCMAKE_BUILD_TYPE=Release
-          
-          echo --- Starting DSP Build ---
+          cmake -B build_dsp -G "NMake Makefiles" ^
+            -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" ^
+            -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" ^
+            -DTI_CGT_DIR="C:/TI/c6000_7.4.24" ^
+            -DAAX_DSP_TYPE=HDX ^
+            -DCMAKE_BUILD_TYPE=Release
           cmake --build build_dsp --config Release --target Roomove_DSP
 
-      - name: Inject DSP and Page Tables
-        if: env.DSP_ENABLED == 'true'
+      # --- 3. THE "STITCH" & INJECTION ---
+      - name: Verify and Inject
         shell: powershell
         run: |
-          # The exact path JUCE 8 uses for AAX artifacts
+          # Path logic for JUCE 8 AAX artifacts
           $Artifacts_Root = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin"
-          $Bundle_Res = "$Artifacts_Root/Contents/Resources/"
           $Win64_Bin = "$Artifacts_Root/Contents/Win64/Roomove.aaxplugin"
+          $Bundle_Res = "$Artifacts_Root/Contents/Resources/"
 
-          # CRITICAL CHECK: Does the Native binary actually exist?
+          # THE CRITICAL HOLLOW BUNDLE CHECK
           if (!(Test-Path $Win64_Bin)) {
-              Write-Error "CRITICAL FAILURE: Native Win64 binary not found at $Win64_Bin. Pro Tools will not see the plugin!"
+              Write-Error "CRITICAL FAILURE: Native binary missing at $Win64_Bin. Packaging failed!"
               exit 1
           }
 
           if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res }
-          
-          # Inject DSP and XML
-          Copy-Item -Path "build_dsp/libRoomove_DSP.a" -Destination "${Bundle_Res}Roomove_DSP.a" -Force
-          Copy-Item -Path "Resources/Roomove_PageTable.xml" -Destination $Bundle_Res -Force
-          Write-Host "Injection successful into $Artifacts_Root"
 
-      - name: Deploy to Local Plug-Ins Folder
+          # Inject DSP Binary if it was built
+          if ("${{ env.DSP_ENABLED }}" -eq "true") {
+              if (Test-Path "build_dsp/libRoomove_DSP.a") {
+                  Copy-Item -Path "build_dsp/libRoomove_DSP.a" -Destination "${Bundle_Res}Roomove_DSP.a" -Force
+                  Write-Host "DSP Binary Injected."
+              }
+          }
+
+          # Inject Page Table (Critical for S6L)
+          if (Test-Path "Resources/Roomove_PageTable.xml") {
+              Copy-Item -Path "Resources/Roomove_PageTable.xml" -Destination $Bundle_Res -Force
+              Write-Host "Page Table Injected."
+          }
+
+      # --- 4. DEPLOYMENT ---
+      - name: Deploy to Pro Tools
         shell: powershell
         run: |
           $Source = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin"
           $Dest = "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\Roomove.aaxplugin"
           
-          if (Test-Path $Source) {
-              # Remove old version to prevent "File in Use" or ghosting issues
-              if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest -ErrorAction SilentlyContinue }
-              
-              # Copy the entire bundle
-              Copy-Item -Path $Source -Destination "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\" -Recurse -Force
-              Write-Host "Deployed to Pro Tools folder: $Dest"
-          } else {
-              Write-Error "Deployment failed: Source folder $Source does not exist."
-              exit 1
-          }
-      - name: Debug Path Hunt
+          # Kill Pro Tools/Venue if running to unlock files
+          Get-Process -Name "ProTools", "Venue" -ErrorAction SilentlyContinue | Stop-Process -Force
+          
+          if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
+          Copy-Item -Path $Source -Destination "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\" -Recurse -Force
+          Write-Host "Successfully deployed to $Dest"
+
+      # --- 5. LOGGING FALLBACK ---
+      - name: Path Debugger
+        if: always()
         shell: powershell
         run: |
-           Write-Host "Searching for any .aaxplugin or .dll files..."
+           Write-Host "Final check of build directory..."
            Get-ChildItem -Path build_native -Filter "*.aaxplugin" -Recurse
-           Get-ChildItem -Path build_native -Filter "*.dll" -Recurse
