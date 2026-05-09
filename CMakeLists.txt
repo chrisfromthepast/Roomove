@@ -6,31 +6,26 @@ project(Roomove VERSION 0.1.0)
 # =======================================================
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
-    # ... standard/library setup ...
-    set(AAX_SDK_PATH "C:/SDKs/AAX-SDK")
-    target_include_directories(Roomove_DSP PRIVATE 
-        ${AAX_SDK_PATH}/Interfaces
-        ${AAX_SDK_PATH}/Interfaces/ACF # Often required for DSP builds
-    )
     # ---------------------------------------------------
     # 1. HARDWARE WORLD (TI DSP COMPILER)
     # ---------------------------------------------------
     message(STATUS "--- Configuring AAX DSP Algorithm (TI Compiler) ---")
-    
+
     # Force legacy C++ so the TI DSP compiler doesn't panic
-    set(CMAKE_CXX_STANDARD 98) 
-    
-    # Define the raw DSP algorithm here. 
+    set(CMAKE_CXX_STANDARD 98)
+
+    # Define the raw DSP algorithm as a STATIC library
     # NOTE: You CANNOT use PluginProcessor.cpp or JUCE here!
-# Define the raw DSP algorithm here as a STATIC library
-    # to satisfy the bare-metal TI compiler environment.
     add_library(Roomove_DSP STATIC
         dsp/RoomoveDSP.cpp
     )
-    
+
     # The DSP compiler still needs to know where the AAX SDK headers are
     set(AAX_SDK_PATH "C:/SDKs/AAX-SDK")
-    target_include_directories(Roomove_DSP PRIVATE ${AAX_SDK_PATH}/Interfaces)
+    target_include_directories(Roomove_DSP PRIVATE
+        ${AAX_SDK_PATH}/Interfaces
+        ${AAX_SDK_PATH}/Interfaces/ACF
+    )
 
 else()
     # ---------------------------------------------------
