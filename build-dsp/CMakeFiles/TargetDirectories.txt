@@ -1,0 +1,3 @@
+/home/runner/work/Roomove/Roomove/build-dsp/CMakeFiles/Roomove_DSP.dir
+/home/runner/work/Roomove/Roomove/build-dsp/CMakeFiles/edit_cache.dir
+/home/runner/work/Roomove/Roomove/build-dsp/CMakeFiles/rebuild_cache.dir
