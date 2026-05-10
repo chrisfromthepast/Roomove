@@ -1,2 +1,0 @@
-/usr/bin/ar qc libRoomove_DSP.a CMakeFiles/Roomove_DSP.dir/dsp/RoomoveDSP.cpp.obj
-/usr/bin/ranlib libRoomove_DSP.a
