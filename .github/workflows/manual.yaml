@@ -130,4 +130,7 @@ jobs:
 
       - name: Path Debugger
         if: always()
-       `
+        shell: powershell
+        run: |
+           Write-Host "Final check of build directory..."
+           Get-ChildItem -Path build_native -Filter "*.aaxplugin" -Recurse
