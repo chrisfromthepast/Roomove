@@ -83,8 +83,9 @@ namespace
         _nassert((((unsigned int) pointer) & 0x7U) == 0U);
     }
 #else
-    static inline void assumeAligned8(const void*)
+    static inline void assumeAligned8(const void* pointer)
     {
+        (void) pointer;
     }
 #endif
 }
