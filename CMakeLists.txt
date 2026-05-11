@@ -58,6 +58,14 @@ else()
     set(AAX_SDK_PATH "C:/SDKs/AAX-SDK") 
     juce_set_aax_sdk_path("${AAX_SDK_PATH}")
 
+    # Configure AAX DSP support if AAX_DSP_TYPE is provided
+    if(DEFINED AAX_DSP_TYPE)
+        message(STATUS "AAX DSP Type configured: ${AAX_DSP_TYPE}")
+        set(AAX_DSP_ENABLED ON)
+    else()
+        set(AAX_DSP_ENABLED OFF)
+    endif()
+
     # I changed the target name to Roomove_AAX to match your manual.yaml build steps!
 juce_add_plugin(Roomove_AAX
         # ... your other settings ...
