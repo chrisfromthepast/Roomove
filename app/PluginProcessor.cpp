@@ -32,7 +32,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ArmorAudioProcessor::createP
 void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     juce::ignoreUnused (samplesPerBlock);
-    const auto requiredStates = juce::jmax (1, getTotalNumOutputChannels());
+    const auto requiredStates = juce::jmax (1, juce::jmax (getTotalNumInputChannels(), getTotalNumOutputChannels()));
     dspStates.resize ((size_t) requiredStates);
 
     for (auto& state : dspStates)

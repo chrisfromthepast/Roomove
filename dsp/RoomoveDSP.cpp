@@ -25,8 +25,6 @@ namespace
     static const float kEnvelopeReleaseTauSeconds = 0.045f;
     static const float kEnvelopeEpsilon = 1.0e-6f;
 
-    static RoomoveDspState gGlobalState = { 48000.0f, 0x3f800000U, 0x3f800000U, 1.0f, 0.12f, 0.0f, 0.997f };
-
     static inline float clampf(float x, float lo, float hi)
     {
         return (x < lo) ? lo : ((x > hi) ? hi : x);
@@ -57,6 +55,18 @@ namespace
         } v;
         v.u = x;
         return v.f;
+    }
+
+    static inline float computeMaskSmoothing(float sampleRate)
+    {
+        const float hopTimeSeconds = kHopLengthSamples / sampleRate;
+        const float alpha = hopTimeSeconds / (kMaskTauSeconds + hopTimeSeconds);
+        return clampf(alpha, 0.01f, 0.5f);
+    }
+
+    static inline float computeEnvelopeRelease(float sampleRate)
+    {
+        return expf(-1.0f / (kEnvelopeReleaseTauSeconds * sampleRate));
     }
 
     static inline void atomicStoreU32(volatile unsigned int* location, unsigned int value)
@@ -90,6 +100,21 @@ namespace
         (void) pointer;
     }
 #endif
+
+    static RoomoveDspState makeDefaultState()
+    {
+        RoomoveDspState state;
+        state.sampleRate = kDefaultSampleRate;
+        state.armorStrengthBits = floatToBits(kDefaultStrength);
+        state.targetMaskBits = floatToBits(kDefaultMask);
+        state.currentMask = kDefaultMask;
+        state.maskSmoothing = computeMaskSmoothing(kDefaultSampleRate);
+        state.peakEnvelope = 0.0f;
+        state.envelopeRelease = computeEnvelopeRelease(kDefaultSampleRate);
+        return state;
+    }
+
+    static RoomoveDspState gGlobalState = makeDefaultState();
 }
 
 extern "C"
@@ -105,10 +130,8 @@ extern "C"
         state->currentMask = kDefaultMask;
         state->peakEnvelope = 0.0f;
 
-        const float hopTimeSeconds = kHopLengthSamples / state->sampleRate;
-        const float alpha = hopTimeSeconds / (kMaskTauSeconds + hopTimeSeconds);
-        state->maskSmoothing = clampf(alpha, 0.01f, 0.5f);
-        state->envelopeRelease = expf(-1.0f / (kEnvelopeReleaseTauSeconds * state->sampleRate));
+        state->maskSmoothing = computeMaskSmoothing(state->sampleRate);
+        state->envelopeRelease = computeEnvelopeRelease(state->sampleRate);
     }
 
     void roomoveDspStateSetArmorStrength(RoomoveDspState* state, float armorStrength)
@@ -157,6 +180,7 @@ extern "C"
             if (state->peakEnvelope > kEnvelopeEpsilon)
             {
                 const float ratio = magnitude / (state->peakEnvelope + kEnvelopeEpsilon);
+                // sqrt softens the gain curve so decays are attenuated audibly without hard gating.
                 adaptiveMask = clampf(sqrtf(ratio), kMaskFloor, kMaskCeil);
             }
 
