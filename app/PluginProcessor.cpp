@@ -31,39 +31,29 @@ juce::AudioProcessorValueTreeState::ParameterLayout ArmorAudioProcessor::createP
 
 void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // 1. Pre-allocate EVERYTHING (Safe and required for DSP)
-    sidechainBuffer.setSize(1, 512); 
-    fifo.reset();
+    juce::ignoreUnused (samplesPerBlock);
+    const auto requiredStates = juce::jmax (1, juce::jmax (getTotalNumInputChannels(), getTotalNumOutputChannels()));
+    dspStates.resize ((size_t) requiredStates);
 
-    // 2. Keep RTNeural setup out of builds that cannot compile it
+    for (auto& state : dspStates)
+        roomoveDspStateInit (&state, (float) sampleRate);
 }
 
 void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     const auto armorStrength = armorStrengthValue != nullptr ? armorStrengthValue->load() : 1.0f;
-    auto* channelData = buffer.getWritePointer(0);
 
-    for (int i = 0; i < buffer.getNumSamples(); ++i)
+    for (auto channel = getTotalNumInputChannels(); channel < getTotalNumOutputChannels(); ++channel)
+        buffer.clear (channel, 0, buffer.getNumSamples());
+
+    const auto channelsToProcess = juce::jmin ((int) dspStates.size(), buffer.getNumChannels());
+
+    for (auto channel = 0; channel < channelsToProcess; ++channel)
     {
-        // 1. Peek at the FIFO for a new mask
-        int start1, size1, start2, size2;
-        fifo.prepareToRead(1, start1, size1, start2, size2);
-        
-        if (size1 > 0) {
-            currentMask = maskBuffer[start1];
-            fifo.finishedRead(1);
-        }
-
-        // 2. Apply Mask (Zero Latency path - safe for both Native and DSP)
-        // 0.0 bypasses the mask and 1.0 applies the full current mask value.
-        const auto blendedMask = 1.0f + ((currentMask - 1.0f) * armorStrength);
-        channelData[i] *= blendedMask;
+        roomoveDspStateSetArmorStrength (&dspStates[(size_t) channel], armorStrength);
+        auto* channelData = buffer.getWritePointer (channel);
+        roomoveDspStateProcessAudio (&dspStates[(size_t) channel], channelData, channelData, buffer.getNumSamples());
     }
-
-    // 3. Hide the background thread trigger from the TI compiler
-#if ROOMOVE_HAS_RTNEURAL
-    // Trigger background inference here when the RTNeural path is available
-#endif
 }
 
 
