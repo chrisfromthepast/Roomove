@@ -72,7 +72,7 @@ jobs:
       - name: Verify and Inject
         shell: powershell
         run: |
-          $Bundle = Get-ChildItem -Path build_native -Filter "Roomove.aaxplugin" -Recurse -Directory | Select-Object -First 1
+          $Bundle = Get-ChildItem -Path build_native -Filter "Roomove.aaxplugin" -Recurse -Directory | Where-Object { $_.FullName -match "\\Release\\" } | Select-Object -First 1
           if (!$Bundle) { throw "CRITICAL: Roomove.aaxplugin folder not found!" }
           
           $BundlePath = $Bundle.FullName
