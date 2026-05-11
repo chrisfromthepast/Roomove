@@ -1,14 +1,14 @@
 // dsp/RoomoveDSP.cpp
 // TI C6000-safe DSP core with C linkage and no JUCE dependencies.
 
-#include <stdint.h>
-
 #if defined(__TMS320C6X__)
 #include <c6x.h>
 #endif
 
 namespace
 {
+    typedef char AssertUnsignedIntIs32Bits[(sizeof(unsigned int) == 4) ? 1 : -1];
+
     static const float kDefaultSampleRate = 48000.0f;
     static const float kHopLengthSamples = 512.0f;
     static const float kMaskFloor = 0.02f;
@@ -20,8 +20,8 @@ namespace
     static const float kMaskTauSeconds = 0.008f;
 
     static float gSampleRate = 48000.0f;
-    static volatile uint32_t gArmorStrengthBits = 0x3f800000U;
-    static volatile uint32_t gTargetMaskBits = 0x3f800000U;
+    static volatile unsigned int gArmorStrengthBits = 0x3f800000U;
+    static volatile unsigned int gTargetMaskBits = 0x3f800000U;
     static float gCurrentMask = 1.0f;
     static float gMaskSmoothing = 0.12f;
 
@@ -35,29 +35,29 @@ namespace
         return (x > -1.0e-20f && x < 1.0e-20f) ? 0.0f : x;
     }
 
-    static inline uint32_t floatToBits(float x)
+    static inline unsigned int floatToBits(float x)
     {
         union
         {
             float f;
-            uint32_t u;
+            unsigned int u;
         } v;
         v.f = x;
         return v.u;
     }
 
-    static inline float bitsToFloat(uint32_t x)
+    static inline float bitsToFloat(unsigned int x)
     {
         union
         {
             float f;
-            uint32_t u;
+            unsigned int u;
         } v;
         v.u = x;
         return v.f;
     }
 
-    static inline void atomicStoreU32(volatile uint32_t* location, uint32_t value)
+    static inline void atomicStoreU32(volatile unsigned int* location, unsigned int value)
     {
 #if defined(__GNUC__) || defined(__clang__)
         (void)__sync_lock_test_and_set(location, value);
@@ -67,7 +67,7 @@ namespace
 #endif
     }
 
-    static inline uint32_t atomicLoadU32(volatile uint32_t* location)
+    static inline unsigned int atomicLoadU32(volatile unsigned int* location)
     {
 #if defined(__GNUC__) || defined(__clang__)
         __sync_synchronize();
