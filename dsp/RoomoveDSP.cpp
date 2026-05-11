@@ -7,6 +7,8 @@
 
 namespace
 {
+    typedef char RoomoveRequires32BitUnsignedInt[(sizeof(unsigned int) == 4) ? 1 : -1];
+
     static const float kDefaultSampleRate = 48000.0f;
     static const float kHopLengthSamples = 512.0f;
     static const float kMaskFloor = 0.02f;
