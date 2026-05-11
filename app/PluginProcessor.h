@@ -2,13 +2,6 @@
 
 #include <JuceHeader.h>
 
-#if ! defined(__TMS320C6X__) && __has_include(<RTNeural/RTNeural.h>)
-    #include <RTNeural/RTNeural.h>
-    #define ROOMOVE_HAS_RTNEURAL 1
-#else
-    #define ROOMOVE_HAS_RTNEURAL 0
-#endif
-
 namespace RoomoveParameterIds
 {
     inline constexpr auto armorStrength = "armor_strength";
@@ -48,19 +41,7 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
 private:
-#if ROOMOVE_HAS_RTNEURAL
-    std::unique_ptr<RTNeural::ModelT<float, 1, 1>> model;
-#endif
-
-    juce::AbstractFifo fifo { 1024 };
-    float maskBuffer[1024];
-    float currentMask = 1.0f;
     std::atomic<float>* armorStrengthValue = nullptr;
-
-#if ROOMOVE_HAS_RTNEURAL
-    void runInference();
-#endif
-    juce::AudioBuffer<float> sidechainBuffer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ArmorAudioProcessor)
 };

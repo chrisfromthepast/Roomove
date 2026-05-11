@@ -77,6 +77,7 @@ juce_add_plugin(Roomove_AAX
             app/PluginEditor.h
             app/PluginProcessor.cpp
             app/PluginProcessor.h
+            dsp/RoomoveDSP.cpp
     )
 
     target_compile_definitions(Roomove_AAX
