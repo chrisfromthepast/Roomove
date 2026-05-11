@@ -62,10 +62,10 @@ jobs:
               Select-Object -First 1
 
           if ($DSP_Binary) {
-              $DSP_Staged_Path = Join-Path $DSP_Stage "Roomove_DSP$($DSP_Binary.Extension)"
-              Copy-Item -Path $DSP_Binary.FullName -Destination $DSP_Staged_Path -Force
-              "DSP_STAGED_PATH=$((Resolve-Path $DSP_Staged_Path).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-              Write-Host "DSP binary staged from $($DSP_Binary.FullName) to $DSP_Staged_Path"
+              $DSPStagedPath = Join-Path $DSP_Stage "Roomove_DSP$($DSP_Binary.Extension)"
+              Copy-Item -Path $DSP_Binary.FullName -Destination $DSPStagedPath -Force
+              "DSP_STAGED_PATH=$([System.IO.Path]::GetFullPath($DSPStagedPath))" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+              Write-Host "DSP binary staged from $($DSP_Binary.FullName) to $DSPStagedPath"
           } else {
               Write-Error "DSP build succeeded but no Roomove DSP binary was found under build_dsp."
               exit 1
