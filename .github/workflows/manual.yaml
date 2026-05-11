@@ -56,10 +56,15 @@ jobs:
           $DSP_Stage = "dsp_artifacts"
           if (!(Test-Path $DSP_Stage)) { New-Item -ItemType Directory -Force -Path $DSP_Stage | Out-Null }
 
-          $DSP_Binary = Get-ChildItem -Path "build_dsp" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object { $_.Name -match $env:DSP_PATTERN } |
-              Sort-Object LastWriteTime -Descending |
-              Select-Object -First 1
+          try {
+              $DSP_Binary = Get-ChildItem -Path "build_dsp" -Recurse -File -ErrorAction Stop |
+                  Where-Object { $_.Name -match $env:DSP_PATTERN } |
+                  Sort-Object LastWriteTime -Descending |
+                  Select-Object -First 1
+          } catch {
+              Write-Error "Failed to search build_dsp for DSP artifacts: $($_.Exception.Message)"
+              exit 1
+          }
 
           if ($DSP_Binary) {
               $DSPStagedPath = Join-Path $DSP_Stage "Roomove_DSP$($DSP_Binary.Extension)"
@@ -110,9 +115,14 @@ jobs:
 
           # Check if DSP was integrated by JUCE (if DSP build was enabled)
           if ("${{ env.DSP_ENABLED }}" -eq "true") {
-              $DSP_Check = Get-ChildItem -Path $Contents_Root -Recurse -File -ErrorAction SilentlyContinue |
-                  Where-Object { $_.Name -match $env:DSP_PATTERN } |
-                  Select-Object -First 1
+              try {
+                  $DSP_Check = Get-ChildItem -Path $Contents_Root -Recurse -File -ErrorAction Stop |
+                      Where-Object { $_.Name -match $env:DSP_PATTERN } |
+                      Select-Object -First 1
+              } catch {
+                  Write-Error "Failed to inspect AAX bundle contents for DSP artifacts: $($_.Exception.Message)"
+                  exit 1
+              }
               if ($DSP_Check) {
                   Write-Host "SUCCESS: DSP binary integrated by JUCE: $($DSP_Check.FullName)"
               } else {
