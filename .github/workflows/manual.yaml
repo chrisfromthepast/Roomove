@@ -78,8 +78,8 @@ jobs:
           $BundlePath = $Bundle.FullName
           $ResDir = Join-Path $BundlePath "Contents\Resources"
           
-          # Verified: Using Win64 for standard AAX structure
-          $Win64Bin = Get-ChildItem -Path $BundlePath -Filter "*.aaxplugin" -Recurse | Where-Object { $_.FullName -match "Win64" }
+          # Verify native binary exists in Contents/x64 directory
+          $Win64Bin = Get-ChildItem -Path $BundlePath -Filter "*.aaxplugin" -Recurse | Where-Object { $_.FullName -match "x64" }
           if (!$Win64Bin) { throw "CRITICAL: Bundle is HOLLOW. Build failed to stitch binary!" }
           
           if (!(Test-Path $ResDir)) { New-Item -ItemType Directory -Force -Path $ResDir }
