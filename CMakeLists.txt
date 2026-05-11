@@ -14,8 +14,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
     # Force legacy C++ so the TI DSP compiler doesn't panic
     set(CMAKE_CXX_STANDARD 98)
 
-    # Define the raw DSP algorithm as a STATIC library
-    # NOTE: You CANNOT use PluginProcessor.cpp or JUCE here!
     add_library(Roomove_DSP STATIC
         dsp/RoomoveDSP.cpp
     )
@@ -25,7 +23,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
     target_include_directories(Roomove_DSP PRIVATE
         ${AAX_SDK_PATH}/Interfaces
         ${AAX_SDK_PATH}/Interfaces/ACF
-    )
+        "${TI_CGT_DIR}/include"  # <--- THIS IS THE FIX
+    )    )
 
 else()
     # ---------------------------------------------------
