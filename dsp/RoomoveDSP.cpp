@@ -76,6 +76,17 @@ namespace
         return *location;
 #endif
     }
+
+#if defined(__TMS320C6X__) && !defined(__cplusplus)
+    static inline void assumeAligned8(const void* pointer)
+    {
+        _nassert((((unsigned int) pointer) & 0x7U) == 0U);
+    }
+#else
+    static inline void assumeAligned8(const void*)
+    {
+    }
+#endif
 }
 
 extern "C"
@@ -112,9 +123,9 @@ extern "C"
         const float armorStrength = bitsToFloat(atomicLoadU32(&gArmorStrengthBits));
         const float targetMask = bitsToFloat(atomicLoadU32(&gTargetMaskBits));
 
+        assumeAligned8(inputBuffer);
+        assumeAligned8(outputBuffer);
 #if defined(__TMS320C6X__)
-        _nassert(((int)inputBuffer & 0x7) == 0);
-        _nassert(((int)outputBuffer & 0x7) == 0);
 #pragma MUST_ITERATE(4,,4)
 #endif
         for (int i = 0; i < numSamples; ++i)
