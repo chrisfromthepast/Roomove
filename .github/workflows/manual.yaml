@@ -55,14 +55,13 @@ jobs:
           if (!(Test-Path $DSP_Stage)) { New-Item -ItemType Directory -Force -Path $DSP_Stage | Out-Null }
 
           $DSP_Binary = Get-ChildItem -Path "build_dsp" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object { $_.Name -match '^lib?Roomove_DSP\.(a|out|elf)$' } |
+              Where-Object { $_.Name -match '^(lib)?Roomove_DSP\.(a|out|elf)$' } |
               Sort-Object LastWriteTime -Descending |
               Select-Object -First 1
 
           if ($DSP_Binary) {
               $DSP_Staged_Path = Join-Path $DSP_Stage "Roomove_DSP$($DSP_Binary.Extension)"
               Copy-Item -Path $DSP_Binary.FullName -Destination $DSP_Staged_Path -Force
-              "DSP_BINARY_PATH=$($DSP_Binary.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
               "DSP_STAGED_PATH=$((Resolve-Path $DSP_Staged_Path).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
               Write-Host "DSP binary staged from $($DSP_Binary.FullName) to $DSP_Staged_Path"
           } else {
@@ -110,21 +109,18 @@ jobs:
           # Check if DSP was integrated by JUCE (if DSP build was enabled)
           if ("${{ env.DSP_ENABLED }}" -eq "true") {
               $DSP_Check = Get-ChildItem -Path $Contents_Root -Recurse -File -ErrorAction SilentlyContinue |
-                  Where-Object { $_.Name -match '^lib?Roomove_DSP\.(a|out|elf)$' } |
+                  Where-Object { $_.Name -match '^(lib)?Roomove_DSP\.(a|out|elf)$' } |
                   Select-Object -First 1
               if ($DSP_Check) {
                   Write-Host "SUCCESS: DSP binary integrated by JUCE: $($DSP_Check.FullName)"
               } else {
                   Write-Warning "DSP was built but not found in bundle. Manual injection may be needed."
                   # Fallback: manual injection if JUCE didn't handle it
-                  $DSP_Source = @($env:DSP_STAGED_PATH, $env:DSP_BINARY_PATH) |
-                      Where-Object { $_ -and (Test-Path $_) } |
-                      Select-Object -First 1
-                  if ($DSP_Source) {
+                  if ($env:DSP_STAGED_PATH -and (Test-Path $env:DSP_STAGED_PATH)) {
                       if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res | Out-Null }
-                      $DSP_Destination = Join-Path $Bundle_Res (Split-Path $DSP_Source -Leaf)
-                      Copy-Item -Path $DSP_Source -Destination $DSP_Destination -Force
-                      Write-Host "DSP Binary injected from $DSP_Source to $DSP_Destination"
+                      $DSP_Destination = Join-Path $Bundle_Res (Split-Path $env:DSP_STAGED_PATH -Leaf)
+                      Copy-Item -Path $env:DSP_STAGED_PATH -Destination $DSP_Destination -Force
+                      Write-Host "DSP Binary injected from $env:DSP_STAGED_PATH to $DSP_Destination"
                   } else {
                       Write-Error "DSP build was enabled, but no staged DSP artifact was available for injection."
                       exit 1
