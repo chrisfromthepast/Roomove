@@ -52,10 +52,11 @@ jobs:
         run: |
           # Create a staging directory for DSP artifacts that JUCE can find
           $DSP_Stage = "dsp_artifacts"
+          $DSP_Pattern = '^(lib)?Roomove_DSP\.(a|out|elf)$'
           if (!(Test-Path $DSP_Stage)) { New-Item -ItemType Directory -Force -Path $DSP_Stage | Out-Null }
 
           $DSP_Binary = Get-ChildItem -Path "build_dsp" -Recurse -File -ErrorAction SilentlyContinue |
-              Where-Object { $_.Name -match '^(lib)?Roomove_DSP\.(a|out|elf)$' } |
+              Where-Object { $_.Name -match $DSP_Pattern } |
               Sort-Object LastWriteTime -Descending |
               Select-Object -First 1
 
@@ -97,6 +98,7 @@ jobs:
           $Contents_Root = "$Artifacts_Root/Contents"
           $Win64_Bin = "$Artifacts_Root/Contents/x64/Roomove.aaxplugin"
           $Bundle_Res = "$Contents_Root/Resources/"
+          $DSP_Pattern = '^(lib)?Roomove_DSP\.(a|out|elf)$'
 
           # Verify the native binary was built correctly
           if (!(Test-Path $Win64_Bin)) {
@@ -109,7 +111,7 @@ jobs:
           # Check if DSP was integrated by JUCE (if DSP build was enabled)
           if ("${{ env.DSP_ENABLED }}" -eq "true") {
               $DSP_Check = Get-ChildItem -Path $Contents_Root -Recurse -File -ErrorAction SilentlyContinue |
-                  Where-Object { $_.Name -match '^(lib)?Roomove_DSP\.(a|out|elf)$' } |
+                  Where-Object { $_.Name -match $DSP_Pattern } |
                   Select-Object -First 1
               if ($DSP_Check) {
                   Write-Host "SUCCESS: DSP binary integrated by JUCE: $($DSP_Check.FullName)"
