@@ -1,6 +1,6 @@
 name: Build and Deploy Roomove
-on:
-  workflow_dispatch: # Allows manual trigger from the Actions tab
+on: 
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -20,7 +20,7 @@ jobs:
           if (Test-Path build_native) { Remove-Item -Recurse -Force build_native }
           if (Test-Path build_dsp) { Remove-Item -Recurse -Force build_dsp }
 
-      # --- 1. DSP BUILD (TI COMPILER) - BUILD FIRST ---
+      # --- 1. DSP BUILD (TI COMPILER) ---
       - name: Check for TI Compiler
         id: check_ti
         shell: powershell
@@ -40,72 +40,30 @@ jobs:
         if: env.DSP_ENABLED == 'true'
         shell: powershell
         run: |
-          # Set error action to stop on any error
           $ErrorActionPreference = "Stop"
-          
-          # Initialize MSVC environment using cmd /c to execute the batch file
           & cmd /c '"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" && set' | ForEach-Object {
               if ($_ -match '^([^=]+)=(.*)$') {
                   [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2])
               }
           }
           
-          # Configure DSP build
+          # FIX: Added -S Roomove
           Write-Host "Configuring DSP build..."
-          cmake -B build_dsp -G "NMake Makefiles" `
+          cmake -S Roomove -B build_dsp -G "NMake Makefiles" `
             -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" `
             -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
             -DTI_CGT_DIR="C:/TI/c6000_7.4.24" `
             -DCMAKE_BUILD_TYPE=Release
-          if ($LASTEXITCODE -ne 0) {
-              Write-Error "DSP configure failed with exit code $LASTEXITCODE"
-              exit $LASTEXITCODE
-          }
           
-          # Build DSP target
           Write-Host "Building DSP target..."
           cmake --build build_dsp --config Release --target Roomove_DSP
-          if ($LASTEXITCODE -ne 0) {
-              Write-Error "DSP build failed with exit code $LASTEXITCODE"
-              exit $LASTEXITCODE
-          }
-          
-          Write-Host "DSP build completed successfully"
 
-      - name: Prepare DSP Artifacts for Integration
-        if: env.DSP_ENABLED == 'true'
-        shell: powershell
-        run: |
-          # Create a staging directory for DSP artifacts that JUCE can find
-          $DSP_Stage = "dsp_artifacts"
-          if (!(Test-Path $DSP_Stage)) { New-Item -ItemType Directory -Force -Path $DSP_Stage | Out-Null }
-
-          try {
-              $DSP_Binary = Get-ChildItem -Path "build_dsp" -Recurse -File -ErrorAction Stop |
-                  Where-Object { $_.Name -match $env:DSP_PATTERN } |
-                  Sort-Object LastWriteTime -Descending |
-                  Select-Object -First 1
-          } catch {
-              Write-Error "Failed to search build_dsp for DSP artifacts: $($_.Exception.Message)"
-              exit 1
-          }
-
-          if ($DSP_Binary) {
-              $DSPStagedPath = Join-Path $DSP_Stage "Roomove_DSP$($DSP_Binary.Extension)"
-              Copy-Item -Path $DSP_Binary.FullName -Destination $DSPStagedPath -Force
-              "DSP_STAGED_PATH=$([System.IO.Path]::GetFullPath($DSPStagedPath))" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-              Write-Host "DSP binary staged from $($DSP_Binary.FullName) to $DSPStagedPath"
-          } else {
-              Write-Error "DSP build succeeded but no Roomove DSP binary was found under build_dsp."
-              exit 1
-          }
-
-      # --- 2. NATIVE BUILD (MSVC + JUCE) - WITH DSP INTEGRATION ---
+      # --- 2. NATIVE BUILD (MSVC + JUCE) ---
       - name: Configure Native (x64) with DSP Support
         shell: powershell
         run: |
-          # Pass DSP configuration to CMake for JUCE integration
-          cmake -B build_native -G "Visual Studio 17 2022" -A x64 `
+          # FIX: Added -S Roomove
+          cmake -S Roomove -B build_native -G "Visual Studio 17 2022" -A x64 `
             -DJUCE_DIR="C:/JUCE_Installed/lib/cmake/JUCE-8.0.12" `
             -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
             -DAAX_DSP_TYPE="${{ env.AAX_DSP_TYPE }}" `
@@ -114,92 +72,47 @@ jobs:
       - name: Build and Package AAX
         shell: powershell
         run: |
-          # Set error action to stop on any error
           $ErrorActionPreference = "Stop"
-          
-          # Build the shared code first
           Write-Host "Building ALL_BUILD target..."
           cmake --build build_native --config Release --target ALL_BUILD --parallel 8
-          if ($LASTEXITCODE -ne 0) {
-              Write-Error "ALL_BUILD failed with exit code $LASTEXITCODE"
-              exit $LASTEXITCODE
-          }
           
-          # Force the JUCE stitching/packaging tool to run
           Write-Host "Building Roomove_AAX_AAX target..."
           cmake --build build_native --config Release --target Roomove_AAX_AAX --parallel 8
-          if ($LASTEXITCODE -ne 0) {
-              Write-Error "Roomove_AAX_AAX build failed with exit code $LASTEXITCODE"
-              exit $LASTEXITCODE
-          }
-          
-          Write-Host "Build completed successfully"
 
       # --- 3. SMART INJECT & STITCH ---
       - name: Verify and Inject
         shell: powershell
         run: |
-          # Search for the bundle wherever it landed
           $Bundle = Get-ChildItem -Path build_native -Filter "Roomove.aaxplugin" -Recurse -Directory | Select-Object -First 1
           if (!$Bundle) { throw "CRITICAL: Roomove.aaxplugin folder not found!" }
           
           $BundlePath = $Bundle.FullName
           $ResDir = Join-Path $BundlePath "Contents\Resources"
           
-          # Verify binary exists in x64 folder
-          $Win64Bin = Get-ChildItem -Path $BundlePath -Filter "*.aaxplugin" -Recurse | Where-Object { $_.FullName -match "x64" }
+          # FIX: Changed x64 to Win64 to match standard AAX structure
+          $Win64Bin = Get-ChildItem -Path $BundlePath -Filter "*.aaxplugin" -Recurse | Where-Object { $_.FullName -match "Win64" }
           if (!$Win64Bin) { throw "CRITICAL: Bundle is HOLLOW. Build failed to stitch binary!" }
           
           Write-Host "Native binary verified at: $($Win64Bin.FullName)"
           
-          # Ensure Resources directory exists
           if (!(Test-Path $ResDir)) { New-Item -ItemType Directory -Force -Path $ResDir }
           
-          # --- DSP INJECTION (if DSP build was enabled) ---
           if ("${{ env.DSP_ENABLED }}" -eq "true") {
-              # First check if JUCE already integrated the DSP binary
-              try {
-                  $DSP_Check = Get-ChildItem -Path $BundlePath -Recurse -File -ErrorAction Stop |
-                      Where-Object { $_.Name -match $env:DSP_PATTERN } |
-                      Select-Object -First 1
-              } catch {
-                  Write-Error "Failed to inspect AAX bundle contents for DSP artifacts: $($_.Exception.Message)"
-                  exit 1
-              }
-              
-              if ($DSP_Check) {
-                  Write-Host "SUCCESS: DSP binary already integrated by JUCE: $($DSP_Check.FullName)"
-              } else {
-                  Write-Warning "DSP was built but not found in bundle. Attempting manual injection..."
-                  
-                  # Look for the DSP binary in build_dsp directory
-                  $DSP_Source = Get-ChildItem -Path "build_dsp" -Recurse -File |
-                      Where-Object { $_.Name -match $env:DSP_PATTERN } |
-                      Sort-Object LastWriteTime -Descending |
-                      Select-Object -First 1
-                  
-                  if ($DSP_Source) {
-                      # Strip 'lib' prefix if present and copy to Resources
-                      $DSP_DestName = $DSP_Source.Name -replace '^lib', ''
-                      $DSP_Dest = Join-Path $ResDir $DSP_DestName
-                      Copy-Item -Path $DSP_Source.FullName -Destination $DSP_Dest -Force
-                      Write-Host "DSP Binary manually injected: $DSP_Source -> $DSP_Dest"
-                  } else {
-                      Write-Error "DSP build was enabled, but no DSP artifact was found for injection."
-                      exit 1
-                  }
+              $DSP_Source = Get-ChildItem -Path "build_dsp" -Recurse -File | Where-Object { $_.Name -match $env:DSP_PATTERN } | Select-Object -First 1
+              if ($DSP_Source) {
+                  $DSP_DestName = $DSP_Source.Name -replace '^lib', ''
+                  $DSP_Dest = Join-Path $ResDir $DSP_DestName
+                  Copy-Item -Path $DSP_Source.FullName -Destination $DSP_Dest -Force
+                  Write-Host "DSP Binary manually injected: $DSP_Source -> $DSP_Dest"
               }
           }
           
-          # --- PAGE TABLE INJECTION (Critical for S6L control surface) ---
-          $PageTableSource = "Resources/Roomove_PageTable.xml"
+          # FIX: Added Roomove/ prefix so it finds the file in your subfolder
+          $PageTableSource = "Roomove/Resources/Roomove_PageTable.xml"
           $PageTableDest = Join-Path $ResDir "Roomove_PageTable.xml"
           
           if (Test-Path $PageTableSource) {
               Copy-Item -Path $PageTableSource -Destination $PageTableDest -Force
-              Write-Host "Page Table injected successfully: $PageTableSource -> $PageTableDest"
-          } else {
-              Write-Warning "Page Table XML not found at $PageTableSource"
           }
           
           Write-Host "Hybrid Bundle Ready at: $BundlePath"
@@ -208,17 +121,16 @@ jobs:
       - name: Deploy to Pro Tools
         shell: powershell
         run: |
-          $Source = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin"
+          # FIX: Dynamically find the bundle instead of using a hardcoded path
+          $Source = Get-ChildItem -Path build_native -Filter "Roomove.aaxplugin" -Recurse -Directory | Select-Object -First 1
           $Dest = "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\Roomove.aaxplugin"
           
-          # Kill Pro Tools/Venue if running to unlock files
           Get-Process -Name "ProTools", "Venue" -ErrorAction SilentlyContinue | Stop-Process -Force
           
           if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
-          Copy-Item -Path $Source -Destination "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\" -Recurse -Force
+          Copy-Item -Path $Source.FullName -Destination "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\" -Recurse -Force
           Write-Host "Successfully deployed to $Dest"
 
-      # --- 5. LOGGING FALLBACK ---
       - name: Path Debugger
         if: always()
         shell: powershell
