@@ -20,9 +20,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
         dsp/RoomoveDSP.cpp
     )
 
-    # The DSP compiler still needs to know where the AAX SDK headers are
-    set(AAX_SDK_PATH "C:/SDKs/AAX-SDK")
+    # Fall back to the toolchain's TI_DIR if TI_CGT_DIR was not passed via -D
+    if(NOT DEFINED TI_CGT_DIR)
+        set(TI_CGT_DIR "${TI_DIR}")
+    endif()
+
+    # The DSP compiler still needs to know where the AAX SDK headers are,
+    # and its own standard headers (stdint.h etc.) live under the CGT include dir.
+    if(NOT DEFINED AAX_SDK_PATH)
+        set(AAX_SDK_PATH "C:/SDKs/AAX-SDK")
+    endif()
     target_include_directories(Roomove_DSP PRIVATE
+        ${TI_CGT_DIR}/include
         ${AAX_SDK_PATH}/Interfaces
         ${AAX_SDK_PATH}/Interfaces/ACF
     )
