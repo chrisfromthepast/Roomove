@@ -24,7 +24,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
         ${AAX_SDK_PATH}/Interfaces
         ${AAX_SDK_PATH}/Interfaces/ACF
         "${TI_CGT_DIR}/include"  # <--- THIS IS THE FIX
-    )    )
+    )
 
 else()
     # ---------------------------------------------------
