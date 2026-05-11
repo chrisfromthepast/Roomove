@@ -72,7 +72,7 @@ jobs:
       - name: Verify and Inject
         shell: powershell
         run: |
-          $Bundle = Get-ChildItem -Path build_native -Filter "Roomove.aaxplugin" -Recurse -Directory | Select-Object -First 1
+          $Bundle = Get-ChildItem -Path "build_native\Roomove_AAX_artefacts\Release" -Filter "Roomove.aaxplugin" -Recurse -Directory | Select-Object -First 1
           if (!$Bundle) { throw "CRITICAL: Roomove.aaxplugin folder not found!" }
           
           $BundlePath = $Bundle.FullName
@@ -105,7 +105,7 @@ jobs:
       - name: Deploy to Pro Tools
         shell: powershell
         run: |
-          $Source = Get-ChildItem -Path build_native -Filter "Roomove.aaxplugin" -Recurse -Directory | Select-Object -First 1
+          $Source = Get-ChildItem -Path "build_native\Roomove_AAX_artefacts\Release" -Filter "Roomove.aaxplugin" -Recurse -Directory | Select-Object -First 1
           $Dest = "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\Roomove.aaxplugin"
           
           Get-Process -Name "ProTools", "Venue" -ErrorAction SilentlyContinue | Stop-Process -Force
