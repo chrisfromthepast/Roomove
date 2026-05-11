@@ -52,13 +52,21 @@ jobs:
         run: |
           # Create a staging directory for DSP artifacts that JUCE can find
           $DSP_Stage = "dsp_artifacts"
-          if (!(Test-Path $DSP_Stage)) { New-Item -ItemType Directory -Force -Path $DSP_Stage }
-          
-          if (Test-Path "build_dsp/libRoomove_DSP.a") {
-              Copy-Item -Path "build_dsp/libRoomove_DSP.a" -Destination "$DSP_Stage/Roomove_DSP.a" -Force
-              Write-Host "DSP binary staged at $DSP_Stage/Roomove_DSP.a"
+          if (!(Test-Path $DSP_Stage)) { New-Item -ItemType Directory -Force -Path $DSP_Stage | Out-Null }
+
+          $DSP_Binary = Get-ChildItem -Path "build_dsp" -Recurse -File -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -match '^lib?Roomove_DSP\.(a|out|elf)$' } |
+              Sort-Object LastWriteTime -Descending |
+              Select-Object -First 1
+
+          if ($DSP_Binary) {
+              $DSP_Staged_Path = Join-Path $DSP_Stage "Roomove_DSP$($DSP_Binary.Extension)"
+              Copy-Item -Path $DSP_Binary.FullName -Destination $DSP_Staged_Path -Force
+              "DSP_BINARY_PATH=$($DSP_Binary.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+              "DSP_STAGED_PATH=$((Resolve-Path $DSP_Staged_Path).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+              Write-Host "DSP binary staged from $($DSP_Binary.FullName) to $DSP_Staged_Path"
           } else {
-              Write-Error "DSP build succeeded but binary not found!"
+              Write-Error "DSP build succeeded but no Roomove DSP binary was found under build_dsp."
               exit 1
           }
 
@@ -87,8 +95,9 @@ jobs:
         run: |
           # Path logic for JUCE 8 AAX artifacts
           $Artifacts_Root = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin"
+          $Contents_Root = "$Artifacts_Root/Contents"
           $Win64_Bin = "$Artifacts_Root/Contents/x64/Roomove.aaxplugin"
-          $Bundle_Res = "$Artifacts_Root/Contents/Resources/"
+          $Bundle_Res = "$Contents_Root/Resources/"
 
           # Verify the native binary was built correctly
           if (!(Test-Path $Win64_Bin)) {
@@ -100,22 +109,31 @@ jobs:
 
           # Check if DSP was integrated by JUCE (if DSP build was enabled)
           if ("${{ env.DSP_ENABLED }}" -eq "true") {
-              $DSP_Check = Get-ChildItem -Path $Bundle_Res -Filter "*.a" -ErrorAction SilentlyContinue
+              $DSP_Check = Get-ChildItem -Path $Contents_Root -Recurse -File -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -match '^lib?Roomove_DSP\.(a|out|elf)$' } |
+                  Select-Object -First 1
               if ($DSP_Check) {
                   Write-Host "SUCCESS: DSP binary integrated by JUCE: $($DSP_Check.FullName)"
               } else {
                   Write-Warning "DSP was built but not found in bundle. Manual injection may be needed."
                   # Fallback: manual injection if JUCE didn't handle it
-                  if (Test-Path "build_dsp/libRoomove_DSP.a") {
-                      if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res }
-                      Copy-Item -Path "build_dsp/libRoomove_DSP.a" -Destination "${Bundle_Res}Roomove_DSP.a" -Force
-                      Write-Host "DSP Binary manually injected as fallback."
+                  $DSP_Source = @($env:DSP_STAGED_PATH, $env:DSP_BINARY_PATH) |
+                      Where-Object { $_ -and (Test-Path $_) } |
+                      Select-Object -First 1
+                  if ($DSP_Source) {
+                      if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res | Out-Null }
+                      $DSP_Destination = Join-Path $Bundle_Res (Split-Path $DSP_Source -Leaf)
+                      Copy-Item -Path $DSP_Source -Destination $DSP_Destination -Force
+                      Write-Host "DSP Binary injected from $DSP_Source to $DSP_Destination"
+                  } else {
+                      Write-Error "DSP build was enabled, but no staged DSP artifact was available for injection."
+                      exit 1
                   }
               }
           }
 
           # Inject Page Table (Critical for S6L control surface)
-          if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res }
+          if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res | Out-Null }
           if (Test-Path "Resources/Roomove_PageTable.xml") {
               Copy-Item -Path "Resources/Roomove_PageTable.xml" -Destination $Bundle_Res -Force
               Write-Host "Page Table injected successfully."
