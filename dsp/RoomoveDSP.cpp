@@ -124,9 +124,9 @@ extern "C"
         const float armorStrength = bitsToFloat(atomicLoadU32(&gArmorStrengthBits));
         const float targetMask = bitsToFloat(atomicLoadU32(&gTargetMaskBits));
 
+#if defined(__TMS320C6X__)
         assumeAligned8(inputBuffer);
         assumeAligned8(outputBuffer);
-#if defined(__TMS320C6X__)
 #pragma MUST_ITERATE(4,,4)
 #endif
         for (int i = 0; i < numSamples; ++i)
