@@ -135,59 +135,74 @@ jobs:
           
           Write-Host "Build completed successfully"
 
-      # --- 3. POST-BUILD: INJECT RESOURCES ---
-      - name: Inject Page Table Resource
+      # --- 3. SMART INJECT & STITCH ---
+      - name: Verify and Inject
         shell: powershell
         run: |
-          # Path logic for JUCE 8 AAX artifacts
-          $Artifacts_Root = "build_native/Roomove_AAX_artefacts/Release/AAX/Roomove.aaxplugin"
-          $Contents_Root = "$Artifacts_Root/Contents"
-          $Win64_Bin = "$Artifacts_Root/Contents/x64/Roomove.aaxplugin"
-          $Bundle_Res = "$Contents_Root/Resources/"
-
-          # Verify the native binary was built correctly
-          if (!(Test-Path $Win64_Bin)) {
-              Write-Error "CRITICAL FAILURE: Native binary missing at $Win64_Bin. Packaging failed!"
-              exit 1
-          }
-
-          Write-Host "Native binary verified at $Win64_Bin"
-
-          # Check if DSP was integrated by JUCE (if DSP build was enabled)
+          # Search for the bundle wherever it landed
+          $Bundle = Get-ChildItem -Path build_native -Filter "Roomove.aaxplugin" -Recurse -Directory | Select-Object -First 1
+          if (!$Bundle) { throw "CRITICAL: Roomove.aaxplugin folder not found!" }
+          
+          $BundlePath = $Bundle.FullName
+          $ResDir = Join-Path $BundlePath "Contents\Resources"
+          
+          # Verify binary exists in x64 folder
+          $Win64Bin = Get-ChildItem -Path $BundlePath -Filter "*.aaxplugin" -Recurse | Where-Object { $_.FullName -match "x64" }
+          if (!$Win64Bin) { throw "CRITICAL: Bundle is HOLLOW. Build failed to stitch binary!" }
+          
+          Write-Host "Native binary verified at: $($Win64Bin.FullName)"
+          
+          # Ensure Resources directory exists
+          if (!(Test-Path $ResDir)) { New-Item -ItemType Directory -Force -Path $ResDir }
+          
+          # --- DSP INJECTION (if DSP build was enabled) ---
           if ("${{ env.DSP_ENABLED }}" -eq "true") {
+              # First check if JUCE already integrated the DSP binary
               try {
-                  $DSP_Check = Get-ChildItem -Path $Contents_Root -Recurse -File -ErrorAction Stop |
+                  $DSP_Check = Get-ChildItem -Path $BundlePath -Recurse -File -ErrorAction Stop |
                       Where-Object { $_.Name -match $env:DSP_PATTERN } |
                       Select-Object -First 1
               } catch {
                   Write-Error "Failed to inspect AAX bundle contents for DSP artifacts: $($_.Exception.Message)"
                   exit 1
               }
+              
               if ($DSP_Check) {
-                  Write-Host "SUCCESS: DSP binary integrated by JUCE: $($DSP_Check.FullName)"
+                  Write-Host "SUCCESS: DSP binary already integrated by JUCE: $($DSP_Check.FullName)"
               } else {
-                  Write-Warning "DSP was built but not found in bundle. Manual injection may be needed."
-                  # Fallback: manual injection if JUCE didn't handle it
-                  if ($env:DSP_STAGED_PATH -and (Test-Path $env:DSP_STAGED_PATH)) {
-                      if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res | Out-Null }
-                      $DSP_Destination = Join-Path $Bundle_Res (Split-Path $env:DSP_STAGED_PATH -Leaf)
-                      Copy-Item -Path $env:DSP_STAGED_PATH -Destination $DSP_Destination -Force
-                      Write-Host "DSP Binary injected from $env:DSP_STAGED_PATH to $DSP_Destination"
+                  Write-Warning "DSP was built but not found in bundle. Attempting manual injection..."
+                  
+                  # Look for the DSP binary in build_dsp directory
+                  $DSP_Source = Get-ChildItem -Path "build_dsp" -Recurse -File |
+                      Where-Object { $_.Name -match $env:DSP_PATTERN } |
+                      Sort-Object LastWriteTime -Descending |
+                      Select-Object -First 1
+                  
+                  if ($DSP_Source) {
+                      # Strip 'lib' prefix if present and copy to Resources
+                      $DSP_DestName = $DSP_Source.Name -replace '^lib', ''
+                      $DSP_Dest = Join-Path $ResDir $DSP_DestName
+                      Copy-Item -Path $DSP_Source.FullName -Destination $DSP_Dest -Force
+                      Write-Host "DSP Binary manually injected: $DSP_Source -> $DSP_Dest"
                   } else {
-                      Write-Error "DSP build was enabled, but no staged DSP artifact was available for injection."
+                      Write-Error "DSP build was enabled, but no DSP artifact was found for injection."
                       exit 1
                   }
               }
           }
-
-          # Inject Page Table (Critical for S6L control surface)
-          if (!(Test-Path $Bundle_Res)) { New-Item -ItemType Directory -Force -Path $Bundle_Res | Out-Null }
-          if (Test-Path "Resources/Roomove_PageTable.xml") {
-              Copy-Item -Path "Resources/Roomove_PageTable.xml" -Destination $Bundle_Res -Force
-              Write-Host "Page Table injected successfully."
+          
+          # --- PAGE TABLE INJECTION (Critical for S6L control surface) ---
+          $PageTableSource = "Resources/Roomove_PageTable.xml"
+          $PageTableDest = Join-Path $ResDir "Roomove_PageTable.xml"
+          
+          if (Test-Path $PageTableSource) {
+              Copy-Item -Path $PageTableSource -Destination $PageTableDest -Force
+              Write-Host "Page Table injected successfully: $PageTableSource -> $PageTableDest"
           } else {
-              Write-Warning "Page Table XML not found at Resources/Roomove_PageTable.xml"
+              Write-Warning "Page Table XML not found at $PageTableSource"
           }
+          
+          Write-Host "Hybrid Bundle Ready at: $BundlePath"
 
       # --- 4. DEPLOYMENT ---
       - name: Deploy to Pro Tools
