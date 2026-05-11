@@ -41,11 +41,14 @@ void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     const auto armorStrength = armorStrengthValue != nullptr ? armorStrengthValue->load() : 1.0f;
     roomoveDspSetArmorStrength (armorStrength);
 
-    for (auto channel = 0; channel < buffer.getNumChannels(); ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
-        processRoomoveAudio (channelData, channelData, buffer.getNumSamples());
-    }
+    for (auto channel = getTotalNumInputChannels(); channel < getTotalNumOutputChannels(); ++channel)
+        buffer.clear (channel, 0, buffer.getNumSamples());
+
+    if (buffer.getNumChannels() == 0)
+        return;
+
+    auto* channelData = buffer.getWritePointer (0);
+    processRoomoveAudio (channelData, channelData, buffer.getNumSamples());
 }
 
 
