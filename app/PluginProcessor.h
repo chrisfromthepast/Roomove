@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "../dsp/RoomoveDSP.h"
 
 namespace RoomoveParameterIds
 {
@@ -42,6 +43,7 @@ public:
 
 private:
     std::atomic<float>* armorStrengthValue = nullptr;
+    std::vector<RoomoveDspState> dspStates;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ArmorAudioProcessor)
 };

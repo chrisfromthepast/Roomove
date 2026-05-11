@@ -1,6 +1,5 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "../dsp/RoomoveDSP.h"
 
 namespace
 {
@@ -33,22 +32,28 @@ juce::AudioProcessorValueTreeState::ParameterLayout ArmorAudioProcessor::createP
 void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     juce::ignoreUnused (samplesPerBlock);
-    roomoveDspInit ((float) sampleRate);
+    const auto requiredStates = juce::jmax (1, getTotalNumOutputChannels());
+    dspStates.resize ((size_t) requiredStates);
+
+    for (auto& state : dspStates)
+        roomoveDspStateInit (&state, (float) sampleRate);
 }
 
 void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     const auto armorStrength = armorStrengthValue != nullptr ? armorStrengthValue->load() : 1.0f;
-    roomoveDspSetArmorStrength (armorStrength);
 
     for (auto channel = getTotalNumInputChannels(); channel < getTotalNumOutputChannels(); ++channel)
         buffer.clear (channel, 0, buffer.getNumSamples());
 
-    if (buffer.getNumChannels() == 0)
-        return;
+    const auto channelsToProcess = juce::jmin ((int) dspStates.size(), buffer.getNumChannels());
 
-    auto* channelData = buffer.getWritePointer (0);
-    processRoomoveAudio (channelData, channelData, buffer.getNumSamples());
+    for (auto channel = 0; channel < channelsToProcess; ++channel)
+    {
+        roomoveDspStateSetArmorStrength (&dspStates[(size_t) channel], armorStrength);
+        auto* channelData = buffer.getWritePointer (channel);
+        roomoveDspStateProcessAudio (&dspStates[(size_t) channel], channelData, channelData, buffer.getNumSamples());
+    }
 }
 
 

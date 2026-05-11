@@ -1,6 +1,8 @@
 // dsp/RoomoveDSP.cpp
 // TI C6000-safe DSP core with C linkage and no JUCE dependencies.
 
+#include "RoomoveDSP.h"
+
 #include <math.h>
 
 #if defined(__TMS320C6X__)
@@ -23,13 +25,7 @@ namespace
     static const float kEnvelopeReleaseTauSeconds = 0.045f;
     static const float kEnvelopeEpsilon = 1.0e-6f;
 
-    static float gSampleRate = 48000.0f;
-    static volatile unsigned int gArmorStrengthBits = 0x3f800000U;
-    static volatile unsigned int gTargetMaskBits = 0x3f800000U;
-    static float gCurrentMask = 1.0f;
-    static float gMaskSmoothing = 0.12f;
-    static float gPeakEnvelope = 0.0f;
-    static float gEnvelopeRelease = 0.997f;
+    static RoomoveDspState gGlobalState = { 48000.0f, 0x3f800000U, 0x3f800000U, 1.0f, 0.12f, 0.0f, 0.997f };
 
     static inline float clampf(float x, float lo, float hi)
     {
@@ -98,39 +94,48 @@ namespace
 
 extern "C"
 {
-    void roomoveDspInit(float sampleRate)
+    void roomoveDspStateInit(RoomoveDspState* state, float sampleRate)
     {
-        gSampleRate = (sampleRate > 1000.0f) ? sampleRate : kDefaultSampleRate;
-        atomicStoreU32(&gArmorStrengthBits, floatToBits(kDefaultStrength));
-        atomicStoreU32(&gTargetMaskBits, floatToBits(kDefaultMask));
-        gCurrentMask = kDefaultMask;
-        gPeakEnvelope = 0.0f;
-
-        const float hopTimeSeconds = kHopLengthSamples / gSampleRate;
-        const float alpha = hopTimeSeconds / (kMaskTauSeconds + hopTimeSeconds);
-        gMaskSmoothing = clampf(alpha, 0.01f, 0.5f);
-        gEnvelopeRelease = expf(-1.0f / (kEnvelopeReleaseTauSeconds * gSampleRate));
-    }
-
-    void roomoveDspSetArmorStrength(float armorStrength)
-    {
-        const float clamped = clampf(armorStrength, kStrengthFloor, kStrengthCeil);
-        atomicStoreU32(&gArmorStrengthBits, floatToBits(clamped));
-    }
-
-    void roomoveDspSetMask(float mask)
-    {
-        const float clamped = clampf(mask, kMaskFloor, kMaskCeil);
-        atomicStoreU32(&gTargetMaskBits, floatToBits(clamped));
-    }
-
-    void processRoomoveAudio(float* inputBuffer, float* outputBuffer, int numSamples)
-    {
-        if (inputBuffer == 0 || outputBuffer == 0 || numSamples <= 0)
+        if (state == 0)
             return;
 
-        const float armorStrength = bitsToFloat(atomicLoadU32(&gArmorStrengthBits));
-        const float targetMaskFromHost = bitsToFloat(atomicLoadU32(&gTargetMaskBits));
+        state->sampleRate = (sampleRate > 1000.0f) ? sampleRate : kDefaultSampleRate;
+        atomicStoreU32(&state->armorStrengthBits, floatToBits(kDefaultStrength));
+        atomicStoreU32(&state->targetMaskBits, floatToBits(kDefaultMask));
+        state->currentMask = kDefaultMask;
+        state->peakEnvelope = 0.0f;
+
+        const float hopTimeSeconds = kHopLengthSamples / state->sampleRate;
+        const float alpha = hopTimeSeconds / (kMaskTauSeconds + hopTimeSeconds);
+        state->maskSmoothing = clampf(alpha, 0.01f, 0.5f);
+        state->envelopeRelease = expf(-1.0f / (kEnvelopeReleaseTauSeconds * state->sampleRate));
+    }
+
+    void roomoveDspStateSetArmorStrength(RoomoveDspState* state, float armorStrength)
+    {
+        if (state == 0)
+            return;
+
+        const float clamped = clampf(armorStrength, kStrengthFloor, kStrengthCeil);
+        atomicStoreU32(&state->armorStrengthBits, floatToBits(clamped));
+    }
+
+    void roomoveDspStateSetMask(RoomoveDspState* state, float mask)
+    {
+        if (state == 0)
+            return;
+
+        const float clamped = clampf(mask, kMaskFloor, kMaskCeil);
+        atomicStoreU32(&state->targetMaskBits, floatToBits(clamped));
+    }
+
+    void roomoveDspStateProcessAudio(RoomoveDspState* state, float* inputBuffer, float* outputBuffer, int numSamples)
+    {
+        if (state == 0 || inputBuffer == 0 || outputBuffer == 0 || numSamples <= 0)
+            return;
+
+        const float armorStrength = bitsToFloat(atomicLoadU32(&state->armorStrengthBits));
+        const float targetMaskFromHost = bitsToFloat(atomicLoadU32(&state->targetMaskBits));
 
 #if defined(__TMS320C6X__)
         assumeAligned8(inputBuffer);
@@ -142,25 +147,45 @@ extern "C"
             const float x = sanitizeDenormal(inputBuffer[i]);
             const float magnitude = fabsf(x);
 
-            if (magnitude >= gPeakEnvelope)
-                gPeakEnvelope = magnitude;
+            if (magnitude >= state->peakEnvelope)
+                state->peakEnvelope = magnitude;
             else
-                gPeakEnvelope = (gPeakEnvelope * gEnvelopeRelease) + (magnitude * (1.0f - gEnvelopeRelease));
+                state->peakEnvelope = (state->peakEnvelope * state->envelopeRelease) + (magnitude * (1.0f - state->envelopeRelease));
 
             float adaptiveMask = kDefaultMask;
 
-            if (gPeakEnvelope > kEnvelopeEpsilon)
+            if (state->peakEnvelope > kEnvelopeEpsilon)
             {
-                const float ratio = magnitude / (gPeakEnvelope + kEnvelopeEpsilon);
+                const float ratio = magnitude / (state->peakEnvelope + kEnvelopeEpsilon);
                 adaptiveMask = clampf(sqrtf(ratio), kMaskFloor, kMaskCeil);
             }
 
             const float targetMask = (targetMaskFromHost < adaptiveMask) ? targetMaskFromHost : adaptiveMask;
-            const float delta = targetMask - gCurrentMask;
-            gCurrentMask += delta * gMaskSmoothing;
+            const float delta = targetMask - state->currentMask;
+            state->currentMask += delta * state->maskSmoothing;
 
-            const float blendedMask = 1.0f + ((gCurrentMask - 1.0f) * armorStrength);
+            const float blendedMask = 1.0f + ((state->currentMask - 1.0f) * armorStrength);
             outputBuffer[i] = sanitizeDenormal(x * blendedMask);
         }
+    }
+
+    void roomoveDspInit(float sampleRate)
+    {
+        roomoveDspStateInit(&gGlobalState, sampleRate);
+    }
+
+    void roomoveDspSetArmorStrength(float armorStrength)
+    {
+        roomoveDspStateSetArmorStrength(&gGlobalState, armorStrength);
+    }
+
+    void roomoveDspSetMask(float mask)
+    {
+        roomoveDspStateSetMask(&gGlobalState, mask);
+    }
+
+    void processRoomoveAudio(float* inputBuffer, float* outputBuffer, int numSamples)
+    {
+        roomoveDspStateProcessAudio(&gGlobalState, inputBuffer, outputBuffer, numSamples);
     }
 }
