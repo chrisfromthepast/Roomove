@@ -36,40 +36,31 @@ jobs:
               echo "AAX_DSP_TYPE=" >> $env:GITHUB_ENV
           }
 
-      - name: Configure & Build DSP
+      - name: Build TI DSP
         if: env.DSP_ENABLED == 'true'
-        shell: powershell
+        shell: cmd
         run: |
-          $ErrorActionPreference = "Stop"
-          & cmd /c '"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" && set' | ForEach-Object {
-              if ($_ -match '^([^=]+)=(.*)$') {
-                  [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2])
-              }
-          }
-          
-          Write-Host "Configuring DSP build..."
-          cmake -S . -B build_dsp -G "NMake Makefiles" `
-            -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" `
-            -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
-            -DTI_CGT_DIR="C:/TI/c6000_7.4.24" `
+          call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+          :: Using -S . because we are already in the repo root
+          cmake -S . -B build_dsp -G "NMake Makefiles" ^
+            -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" ^
+            -DTI_CGT_DIR="C:/TI/c6000_7.4.24" ^
+            -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" ^
             -DCMAKE_BUILD_TYPE=Release
-          
-          Write-Host "Building DSP target..."
           cmake --build build_dsp --config Release --target Roomove_DSP
 
       # --- 2. NATIVE BUILD (MSVC + JUCE) ---
-      - name: Configure Native (x64) with DSP Support
+      - name: Configure and Build Native
         shell: powershell
         run: |
+          # Configure
           cmake -S . -B build_native -G "Visual Studio 17 2022" -A x64 `
             -DJUCE_DIR="C:/JUCE_Installed/lib/cmake/JUCE-8.0.12" `
             -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
             -DAAX_DSP_TYPE="${{ env.AAX_DSP_TYPE }}" `
             -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build and Package AAX
-        shell: powershell
-        run: |
+          
+          # Build & Package
           $ErrorActionPreference = "Stop"
           Write-Host "Building ALL_BUILD target..."
           cmake --build build_native --config Release --target ALL_BUILD --parallel 8
@@ -87,11 +78,9 @@ jobs:
           $BundlePath = $Bundle.FullName
           $ResDir = Join-Path $BundlePath "Contents\Resources"
           
-          # FIX: Changed x64 to Win64 to match standard AAX structure
+          # Verified: Using Win64 for standard AAX structure
           $Win64Bin = Get-ChildItem -Path $BundlePath -Filter "*.aaxplugin" -Recurse | Where-Object { $_.FullName -match "Win64" }
           if (!$Win64Bin) { throw "CRITICAL: Bundle is HOLLOW. Build failed to stitch binary!" }
-          
-          Write-Host "Native binary verified at: $($Win64Bin.FullName)"
           
           if (!(Test-Path $ResDir)) { New-Item -ItemType Directory -Force -Path $ResDir }
           
@@ -101,15 +90,13 @@ jobs:
                   $DSP_DestName = $DSP_Source.Name -replace '^lib', ''
                   $DSP_Dest = Join-Path $ResDir $DSP_DestName
                   Copy-Item -Path $DSP_Source.FullName -Destination $DSP_Dest -Force
-                  Write-Host "DSP Binary manually injected: $DSP_Source -> $DSP_Dest"
+                  Write-Host "DSP Binary manually injected: $DSP_DestName"
               }
           }
           
           $PageTableSource = "Resources/Roomove_PageTable.xml"
-          $PageTableDest = Join-Path $ResDir "Roomove_PageTable.xml"
-          
           if (Test-Path $PageTableSource) {
-              Copy-Item -Path $PageTableSource -Destination $PageTableDest -Force
+              Copy-Item -Path $PageTableSource -Destination (Join-Path $ResDir "Roomove_PageTable.xml") -Force
           }
           
           Write-Host "Hybrid Bundle Ready at: $BundlePath"
@@ -118,7 +105,6 @@ jobs:
       - name: Deploy to Pro Tools
         shell: powershell
         run: |
-          # FIX: Dynamically find the bundle instead of using a hardcoded path
           $Source = Get-ChildItem -Path build_native -Filter "Roomove.aaxplugin" -Recurse -Directory | Select-Object -First 1
           $Dest = "C:\Program Files\Common Files\Avid\Audio\Plug-Ins\Roomove.aaxplugin"
           
