@@ -73,6 +73,7 @@ juce_add_plugin(Roomove_AAX
         PLUGIN_MANUFACTURER_CODE Cftp
         PLUGIN_CODE             Rmov
         FORMATS                 AAX
+        PLUGIN_CATEGORIES Dynamics Effect
         AAX_IDENTIFIER          "com.chrisfromthepast.Roomove" # Add this for better ID tracking
         PRODUCT_NAME            "Roomove"
     )
