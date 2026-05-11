@@ -47,9 +47,8 @@ jobs:
               }
           }
           
-          # FIX: Added -S Roomove
           Write-Host "Configuring DSP build..."
-          cmake -S Roomove -B build_dsp -G "NMake Makefiles" `
+          cmake -S . -B build_dsp -G "NMake Makefiles" `
             -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" `
             -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
             -DTI_CGT_DIR="C:/TI/c6000_7.4.24" `
@@ -62,8 +61,7 @@ jobs:
       - name: Configure Native (x64) with DSP Support
         shell: powershell
         run: |
-          # FIX: Added -S Roomove
-          cmake -S Roomove -B build_native -G "Visual Studio 17 2022" -A x64 `
+          cmake -S . -B build_native -G "Visual Studio 17 2022" -A x64 `
             -DJUCE_DIR="C:/JUCE_Installed/lib/cmake/JUCE-8.0.12" `
             -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
             -DAAX_DSP_TYPE="${{ env.AAX_DSP_TYPE }}" `
@@ -107,8 +105,7 @@ jobs:
               }
           }
           
-          # FIX: Added Roomove/ prefix so it finds the file in your subfolder
-          $PageTableSource = "Roomove/Resources/Roomove_PageTable.xml"
+          $PageTableSource = "Resources/Roomove_PageTable.xml"
           $PageTableDest = Join-Path $ResDir "Roomove_PageTable.xml"
           
           if (Test-Path $PageTableSource) {
@@ -133,7 +130,4 @@ jobs:
 
       - name: Path Debugger
         if: always()
-        shell: powershell
-        run: |
-           Write-Host "Final check of build directory..."
-           Get-ChildItem -Path build_native -Filter "*.aaxplugin" -Recurse
+       `
