@@ -38,15 +38,39 @@ jobs:
 
       - name: Configure & Build DSP
         if: env.DSP_ENABLED == 'true'
-        shell: cmd
+        shell: powershell
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
-          cmake -B build_dsp -G "NMake Makefiles" ^
-            -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" ^
-            -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" ^
-            -DTI_CGT_DIR="C:/TI/c6000_7.4.24" ^
+          # Set error action to stop on any error
+          $ErrorActionPreference = "Stop"
+          
+          # Initialize MSVC environment using cmd /c to execute the batch file
+          & cmd /c '"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" && set' | ForEach-Object {
+              if ($_ -match '^([^=]+)=(.*)$') {
+                  [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+              }
+          }
+          
+          # Configure DSP build
+          Write-Host "Configuring DSP build..."
+          cmake -B build_dsp -G "NMake Makefiles" `
+            -DCMAKE_TOOLCHAIN_FILE="ti_toolchain.cmake" `
+            -DAAX_SDK_PATH="C:/SDKs/AAX-SDK" `
+            -DTI_CGT_DIR="C:/TI/c6000_7.4.24" `
             -DCMAKE_BUILD_TYPE=Release
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "DSP configure failed with exit code $LASTEXITCODE"
+              exit $LASTEXITCODE
+          }
+          
+          # Build DSP target
+          Write-Host "Building DSP target..."
           cmake --build build_dsp --config Release --target Roomove_DSP
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "DSP build failed with exit code $LASTEXITCODE"
+              exit $LASTEXITCODE
+          }
+          
+          Write-Host "DSP build completed successfully"
 
       - name: Prepare DSP Artifacts for Integration
         if: env.DSP_ENABLED == 'true'
@@ -88,12 +112,28 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
 
       - name: Build and Package AAX
-        shell: cmd
+        shell: powershell
         run: |
-          :: Build the shared code first
+          # Set error action to stop on any error
+          $ErrorActionPreference = "Stop"
+          
+          # Build the shared code first
+          Write-Host "Building ALL_BUILD target..."
           cmake --build build_native --config Release --target ALL_BUILD --parallel 8
-          :: Force the JUCE stitching/packaging tool to run
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "ALL_BUILD failed with exit code $LASTEXITCODE"
+              exit $LASTEXITCODE
+          }
+          
+          # Force the JUCE stitching/packaging tool to run
+          Write-Host "Building Roomove_AAX_AAX target..."
           cmake --build build_native --config Release --target Roomove_AAX_AAX --parallel 8
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "Roomove_AAX_AAX build failed with exit code $LASTEXITCODE"
+              exit $LASTEXITCODE
+          }
+          
+          Write-Host "Build completed successfully"
 
       # --- 3. POST-BUILD: INJECT RESOURCES ---
       - name: Inject Page Table Resource
