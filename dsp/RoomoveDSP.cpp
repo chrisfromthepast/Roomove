@@ -24,6 +24,7 @@ namespace
     static const float kMaskTauSeconds = 0.008f;
     static const float kEnvelopeReleaseTauSeconds = 0.045f;
     static const float kEnvelopeEpsilon = 1.0e-6f;
+    static const int kOverlapScratchSamples = 1024;
 
     static inline float clampf(float x, float lo, float hi)
     {
@@ -199,10 +200,32 @@ extern "C"
         if (state == 0 || inputBuffer == 0 || outputBuffer == 0 || numSamples <= 0)
             return;
 
-        // Route non-aliased buffers to the restricted kernel and preserve safe in-place behavior otherwise.
-        if (inputBuffer != outputBuffer)
+        const float* inputEnd = inputBuffer + numSamples;
+        const float* outputAsConst = outputBuffer;
+        const float* outputEnd = outputAsConst + numSamples;
+        const int overlaps = (inputBuffer < outputEnd) && (outputAsConst < inputEnd);
+
+        // Route disjoint buffers to the restricted kernel and preserve safe behavior otherwise.
+        if (!overlaps)
         {
             roomoveDspStateProcessAudioNoAlias(state, inputBuffer, outputBuffer, numSamples);
+            return;
+        }
+
+        // Partial overlap is handled using a stack scratch buffer to preserve sequential sample order.
+        if (inputBuffer != outputBuffer)
+        {
+            float scratch[kOverlapScratchSamples];
+            int processed = 0;
+            while (processed < numSamples)
+            {
+                const int remaining = numSamples - processed;
+                const int chunk = (remaining < kOverlapScratchSamples) ? remaining : kOverlapScratchSamples;
+                for (int i = 0; i < chunk; ++i)
+                    scratch[i] = inputBuffer[processed + i];
+                roomoveDspStateProcessAudioNoAlias(state, scratch, outputBuffer + processed, chunk);
+                processed += chunk;
+            }
             return;
         }
 
@@ -216,7 +239,7 @@ extern "C"
 #endif
         for (int i = 0; i < numSamples; ++i)
         {
-            const float x = sanitizeDenormal(outputBuffer[i]);
+            const float x = sanitizeDenormal(inputBuffer[i]);
             const float magnitude = fabsf(x);
 
             if (magnitude >= state->peakEnvelope)

@@ -205,5 +205,10 @@ else()
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
             COMMENT "Running real-time memory hygiene scan"
         )
+        add_test(
+            NAME roomove_realtime_memory_hygiene
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_realtime_memory_hygiene.py"
+                --plugin-processor "${CMAKE_CURRENT_SOURCE_DIR}/app/PluginProcessor.cpp"
+        )
     endif()
 endif()

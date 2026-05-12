@@ -26,6 +26,7 @@ namespace
     {
         constexpr int iterations = 20000;
         constexpr int fifoCapacity = 1024;
+        constexpr std::uint64_t maxYieldIterations = 10000000ULL;
         juce::AbstractFifo fifo(fifoCapacity);
         std::vector<int> storage((size_t) fifoCapacity, -1);
 
@@ -56,7 +57,7 @@ namespace
                     ++yieldIterations;
                     std::this_thread::yield();
                 }
-                if (yieldIterations > 10000000ULL)
+                if (yieldIterations > maxYieldIterations)
                 {
                     mismatch.store(true);
                     break;
@@ -92,7 +93,7 @@ namespace
                     std::this_thread::yield();
                 }
 
-                if (yieldIterations > 10000000ULL && producerDone.load())
+                if (yieldIterations > maxYieldIterations && producerDone.load())
                 {
                     mismatch.store(true);
                     break;
