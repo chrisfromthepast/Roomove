@@ -1,0 +1,14 @@
+Checks: >
+  -*,
+  bugprone-branch-clone,
+  bugprone-sizeof-expression,
+  bugprone-suspicious-memory-comparison,
+  clang-analyzer-core.*,
+  clang-analyzer-cplusplus.NewDelete,
+  cppcoreguidelines-no-malloc,
+  performance-noexcept-move-constructor
+WarningsAsErrors: >
+  clang-analyzer-cplusplus.NewDelete,
+  cppcoreguidelines-no-malloc
+FormatStyle: none
+HeaderFilterRegex: '^(app|dsp)/'

@@ -24,6 +24,7 @@ namespace
     static const float kMaskTauSeconds = 0.008f;
     static const float kEnvelopeReleaseTauSeconds = 0.045f;
     static const float kEnvelopeEpsilon = 1.0e-6f;
+    static const int kOverlapScratchSamples = 1024;
 
     static inline float clampf(float x, float lo, float hi)
     {
@@ -152,7 +153,8 @@ extern "C"
         atomicStoreU32(&state->targetMaskBits, floatToBits(clamped));
     }
 
-    void roomoveDspStateProcessAudio(RoomoveDspState* state, float* inputBuffer, float* outputBuffer, int numSamples)
+    // No-alias kernel for TI software pipeline optimization.
+    void roomoveDspStateProcessAudioNoAlias(RoomoveDspState* state, const float* AAX_RESTRICT inputBuffer, float* AAX_RESTRICT outputBuffer, int numSamples)
     {
         if (state == 0 || inputBuffer == 0 || outputBuffer == 0 || numSamples <= 0)
             return;
@@ -193,6 +195,75 @@ extern "C"
         }
     }
 
+    void roomoveDspStateProcessAudio(RoomoveDspState* state, const float* inputBuffer, float* outputBuffer, int numSamples)
+    {
+        if (state == 0 || inputBuffer == 0 || outputBuffer == 0 || numSamples <= 0)
+            return;
+
+        const float* inputEnd = inputBuffer + numSamples;
+        const float* outputAsConst = outputBuffer;
+        const float* outputEnd = outputAsConst + numSamples;
+        const int overlaps = (inputBuffer < outputEnd) && (outputAsConst < inputEnd);
+
+        // Route disjoint buffers to the restricted kernel and preserve safe behavior otherwise.
+        if (!overlaps)
+        {
+            roomoveDspStateProcessAudioNoAlias(state, inputBuffer, outputBuffer, numSamples);
+            return;
+        }
+
+        // Partial overlap is handled using a stack scratch buffer to preserve sequential sample order.
+        if (inputBuffer != outputBuffer)
+        {
+            float scratch[kOverlapScratchSamples];
+            int processed = 0;
+            while (processed < numSamples)
+            {
+                const int remaining = numSamples - processed;
+                const int chunk = (remaining < kOverlapScratchSamples) ? remaining : kOverlapScratchSamples;
+                for (int i = 0; i < chunk; ++i)
+                    scratch[i] = inputBuffer[processed + i];
+                roomoveDspStateProcessAudioNoAlias(state, scratch, outputBuffer + processed, chunk);
+                processed += chunk;
+            }
+            return;
+        }
+
+        const float armorStrength = bitsToFloat(atomicLoadU32(&state->armorStrengthBits));
+        const float targetMaskFromHost = bitsToFloat(atomicLoadU32(&state->targetMaskBits));
+
+#if defined(__TMS320C6X__)
+        assumeAligned8(inputBuffer);
+        assumeAligned8(outputBuffer);
+#pragma MUST_ITERATE(4,,4)
+#endif
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float x = sanitizeDenormal(inputBuffer[i]);
+            const float magnitude = fabsf(x);
+
+            if (magnitude >= state->peakEnvelope)
+                state->peakEnvelope = magnitude;
+            else
+                state->peakEnvelope = (state->peakEnvelope * state->envelopeRelease) + (magnitude * (1.0f - state->envelopeRelease));
+
+            float adaptiveMask = kDefaultMask;
+
+            if (state->peakEnvelope > kEnvelopeEpsilon)
+            {
+                const float ratio = magnitude / (state->peakEnvelope + kEnvelopeEpsilon);
+                adaptiveMask = clampf(sqrtf(ratio), kMaskFloor, kMaskCeil);
+            }
+
+            const float targetMask = (targetMaskFromHost < adaptiveMask) ? targetMaskFromHost : adaptiveMask;
+            const float delta = targetMask - state->currentMask;
+            state->currentMask += delta * state->maskSmoothing;
+
+            const float blendedMask = 1.0f + ((state->currentMask - 1.0f) * armorStrength);
+            outputBuffer[i] = sanitizeDenormal(x * blendedMask);
+        }
+    }
+
     void roomoveDspInit(float sampleRate)
     {
         roomoveDspStateInit(&gGlobalState, sampleRate);
@@ -208,8 +279,13 @@ extern "C"
         roomoveDspStateSetMask(&gGlobalState, mask);
     }
 
-    void processRoomoveAudio(float* inputBuffer, float* outputBuffer, int numSamples)
+    void processRoomoveAudio(const float* inputBuffer, float* outputBuffer, int numSamples)
     {
         roomoveDspStateProcessAudio(&gGlobalState, inputBuffer, outputBuffer, numSamples);
+    }
+
+    void processRoomoveAudioNoAlias(const float* AAX_RESTRICT inputBuffer, float* AAX_RESTRICT outputBuffer, int numSamples)
+    {
+        roomoveDspStateProcessAudioNoAlias(&gGlobalState, inputBuffer, outputBuffer, numSamples);
     }
 }
