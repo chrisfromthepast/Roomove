@@ -41,6 +41,7 @@ void ArmorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
 void ArmorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
+    juce::ScopedNoDenormals noDenormals;
     const auto armorStrength = armorStrengthValue != nullptr ? armorStrengthValue->load() : 1.0f;
 
     for (auto channel = getTotalNumInputChannels(); channel < getTotalNumOutputChannels(); ++channel)

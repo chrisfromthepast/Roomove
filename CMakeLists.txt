@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 project(Roomove VERSION 0.1.0)
+include(CTest)
 
 # =======================================================
 # THE "Y" SPLIT: Hardware vs. Host
@@ -172,6 +173,37 @@ else()
                 juce::juce_recommended_config_flags
                 juce::juce_recommended_lto_flags
                 juce::juce_recommended_warning_flags
+        )
+    endif()
+
+    option(ROOMOVE_ENABLE_VALIDATION_TESTS "Build Roomove validation tests" ON)
+    if(ROOMOVE_ENABLE_VALIDATION_TESTS AND TARGET juce::juce_core)
+        enable_testing()
+        add_executable(Roomove_ValidationTests
+            tests/RealtimeValidationTests.cpp
+            dsp/RoomoveDSP.cpp
+        )
+        target_include_directories(Roomove_ValidationTests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/dsp
+            ${CMAKE_CURRENT_SOURCE_DIR}/app
+        )
+        target_link_libraries(Roomove_ValidationTests PRIVATE
+            juce::juce_core
+        )
+        target_compile_definitions(Roomove_ValidationTests PRIVATE
+            ROOMOVE_REPO_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+        add_test(NAME Roomove_ValidationTests COMMAND Roomove_ValidationTests)
+    endif()
+
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_custom_target(roomove_realtime_memory_hygiene
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_realtime_memory_hygiene.py"
+                --plugin-processor "${CMAKE_CURRENT_SOURCE_DIR}/app/PluginProcessor.cpp"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            COMMENT "Running real-time memory hygiene scan"
         )
     endif()
 endif()

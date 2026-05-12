@@ -1,0 +1,26 @@
+suite:
+  name: DSH_SigCancellation
+  plugin_id: com.chrisfromthepast.Roomove
+  description: >
+    Native-vs-DSP null test suite that compares raw output buffers with
+    diff/bacmp to guarantee cancellation parity.
+  environment:
+    shell: DSH
+    sample_rate_hz: 48000
+    buffer_size: 64
+  tests:
+    - name: NativeReferenceRender
+      command_sequence:
+        - "load plugin ${suite.plugin_id} --arch Native"
+        - "render input fixtures/pink_noise_48k.wav output artifacts/native.raw"
+    - name: DSPRender
+      command_sequence:
+        - "load plugin ${suite.plugin_id} --arch DSP"
+        - "render input fixtures/pink_noise_48k.wav output artifacts/dsp.raw"
+    - name: CompareRawBuffers
+      command_sequence:
+        - "diff artifacts/native.raw artifacts/dsp.raw"
+        - "bacmp artifacts/native.raw artifacts/dsp.raw"
+      assertions:
+        - "diff exit_code == 0"
+        - "bacmp exit_code == 0"

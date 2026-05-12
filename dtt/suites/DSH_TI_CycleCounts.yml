@@ -1,0 +1,28 @@
+suite:
+  name: DSH_TI_CycleCounts
+  plugin_id: com.chrisfromthepast.Roomove
+  description: >
+    Multi-instance HDX cycle profiling suite capturing
+    AAX_eProperty_TI_SharedCycleCount and AAX_eProperty_TI_InstanceCycleCount
+    using DAE.cyclesshared output.
+  environment:
+    shell: DSH
+    sample_rate_hz: 48000
+    buffer_size: 64
+  variables:
+    plugin_instances: [1, 2, 4, 8]
+  tests:
+    - name: InstanceAndSharedCycles
+      command_sequence:
+        - "set report-file DAE.cyclesshared"
+        - "load plugin ${suite.plugin_id}"
+        - "instantiate ${suite.plugin_id} ${plugin_instances}"
+        - "run DSH_TI_CycleCounts --plugin ${suite.plugin_id} --instances ${plugin_instances}"
+        - "capture property AAX_eProperty_TI_SharedCycleCount"
+        - "capture property AAX_eProperty_TI_InstanceCycleCount"
+        - "save report DAE.cyclesshared"
+      assertions:
+        - "property AAX_eProperty_TI_SharedCycleCount exists"
+        - "property AAX_eProperty_TI_InstanceCycleCount exists"
+        - "report DAE.cyclesshared contains AAX_eProperty_TI_SharedCycleCount"
+        - "report DAE.cyclesshared contains AAX_eProperty_TI_InstanceCycleCount"
