@@ -37,7 +37,7 @@ namespace
 
         std::thread producer([&]()
         {
-            std::uint64_t spins = 0;
+            std::uint64_t yieldIterations = 0;
             while (produced.load() < iterations)
             {
                 int start1 = 0;
@@ -53,10 +53,10 @@ namespace
                 }
                 else
                 {
-                    ++spins;
+                    ++yieldIterations;
                     std::this_thread::yield();
                 }
-                if (spins > 10000000ULL)
+                if (yieldIterations > 10000000ULL)
                 {
                     mismatch.store(true);
                     break;
@@ -67,7 +67,7 @@ namespace
 
         std::thread consumer([&]()
         {
-            std::uint64_t spins = 0;
+            std::uint64_t yieldIterations = 0;
             while (consumed.load() < iterations)
             {
                 int start1 = 0;
@@ -88,11 +88,11 @@ namespace
                 }
                 else
                 {
-                    ++spins;
+                    ++yieldIterations;
                     std::this_thread::yield();
                 }
 
-                if (spins > 10000000ULL && producerDone.load())
+                if (yieldIterations > 10000000ULL && producerDone.load())
                 {
                     mismatch.store(true);
                     break;

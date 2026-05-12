@@ -33,15 +33,15 @@ def gather_asm_files(asm_files: Sequence[str], asm_dir: str) -> List[pathlib.Pat
 
 
 def parse_bounds(text: str) -> List[Tuple[int, int, int]]:
-    lcd_bounds = [int(match) for match in re.findall(r"Loop Carried Dependency Bound\s*\(\^\)\s*[:=]\s*(\d+)", text)]
-    prb_bounds = [int(match) for match in re.findall(r"Partitioned Resource Bound\s*\(\*\)\s*[:=]\s*(\d+)", text)]
-    pair_count = max(len(lcd_bounds), len(prb_bounds))
+    loop_carried_dependency_bounds = [int(match) for match in re.findall(r"Loop Carried Dependency Bound\s*\(\^\)\s*[:=]\s*(\d+)", text)]
+    partitioned_resource_bounds = [int(match) for match in re.findall(r"Partitioned Resource Bound\s*\(\*\)\s*[:=]\s*(\d+)", text)]
+    pair_count = max(len(loop_carried_dependency_bounds), len(partitioned_resource_bounds))
     triples: List[Tuple[int, int, int]] = []
     for index in range(pair_count):
-        lcd_value = lcd_bounds[index] if index < len(lcd_bounds) else 0
-        prb_value = prb_bounds[index] if index < len(prb_bounds) else 0
-        minimum_cycles = max(lcd_value, prb_value)
-        triples.append((lcd_value, prb_value, minimum_cycles))
+        loop_carried_dependency_value = loop_carried_dependency_bounds[index] if index < len(loop_carried_dependency_bounds) else 0
+        partitioned_resource_value = partitioned_resource_bounds[index] if index < len(partitioned_resource_bounds) else 0
+        minimum_cycles = max(loop_carried_dependency_value, partitioned_resource_value)
+        triples.append((loop_carried_dependency_value, partitioned_resource_value, minimum_cycles))
     return triples
 
 
