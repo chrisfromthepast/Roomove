@@ -152,6 +152,7 @@ extern "C"
         atomicStoreU32(&state->targetMaskBits, floatToBits(clamped));
     }
 
+    // No-alias kernel for TI software pipeline optimization.
     void roomoveDspStateProcessAudioNoAlias(RoomoveDspState* state, const float* AAX_RESTRICT inputBuffer, float* AAX_RESTRICT outputBuffer, int numSamples)
     {
         if (state == 0 || inputBuffer == 0 || outputBuffer == 0 || numSamples <= 0)
@@ -198,6 +199,7 @@ extern "C"
         if (state == 0 || inputBuffer == 0 || outputBuffer == 0 || numSamples <= 0)
             return;
 
+        // Route non-aliased buffers to the restricted kernel and preserve safe in-place behavior otherwise.
         if (inputBuffer != outputBuffer)
         {
             roomoveDspStateProcessAudioNoAlias(state, inputBuffer, outputBuffer, numSamples);

@@ -70,7 +70,7 @@ def _extract_function_body(text: str, signature_regex: str) -> Optional[Function
 def _extract_named_functions(text: str) -> List[FunctionBody]:
     functions: List[FunctionBody] = []
     pattern = re.compile(
-        r"^[\w:\<\>\s\*&]+?\b(\w+)\s*\([^;{}]*\)\s*(?:const\s*)?\{",
+        r"^[\w:<>\s\*&]+?\b(\w+)\s*\([^;{}]*\)\s*(?:const\s*)?\{",
         flags=re.MULTILINE,
     )
     for match in pattern.finditer(text):
