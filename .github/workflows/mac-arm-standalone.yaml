@@ -101,21 +101,3 @@ jobs:
           name: Roomove-mac-arm64-standalone-${{ github.event.inputs.version }}
           path: ${{ env.ZIP_PATH }}
           if-no-files-found: error
-
-      # ------------------------------------------------------------------
-      # 8. CREATE GITHUB RELEASE (tags + attaches the zip)
-      # ------------------------------------------------------------------
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="v${{ github.event.inputs.version }}-mac-arm64"
-          TITLE="Roomove ${{ github.event.inputs.version }} — Mac ARM64 Standalone"
-
-          # Create (or update) the release tag and upload the zip
-          gh release create "$TAG" "${{ env.ZIP_PATH }}" \
-            --title "$TITLE" \
-            --notes "Standalone build for Apple Silicon (arm64). macOS 12.0+." \
-            --repo "${{ github.repository }}" \
-            || gh release upload "$TAG" "${{ env.ZIP_PATH }}" \
-                 --repo "${{ github.repository }}" --clobber
