@@ -65,13 +65,15 @@ else()
         endif()
 
         juce_add_plugin(Roomove
-            COPY_PLUGIN_AFTER_BUILD  FALSE
-            PLUGIN_MANUFACTURER_CODE Cftp
-            PLUGIN_CODE              Rmov
-            FORMATS                  Standalone
-            PLUGIN_CATEGORIES        Dynamics Effect
-            BUNDLE_ID                "com.chrisfromthepast.Roomove"
-            PRODUCT_NAME             "Roomove"
+            COPY_PLUGIN_AFTER_BUILD       FALSE
+            PLUGIN_MANUFACTURER_CODE      Cftp
+            PLUGIN_CODE                   Rmov
+            FORMATS                       Standalone
+            PLUGIN_CATEGORIES             Dynamics Effect
+            BUNDLE_ID                     "com.chrisfromthepast.Roomove"
+            PRODUCT_NAME                  "Roomove"
+            MICROPHONE_PERMISSION_ENABLED TRUE
+            MICROPHONE_PERMISSION_TEXT    "Roomove needs microphone access to process live audio."
         )
 
         juce_generate_juce_header(Roomove)
