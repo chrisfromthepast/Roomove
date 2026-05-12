@@ -77,7 +77,8 @@ def check_asm_file(path: pathlib.Path) -> int:
 def check_restrict_rule(source_files: Sequence[str]) -> int:
     violation_count = 0
     signature_pattern = re.compile(
-        r"(roomoveDspStateProcessAudioNoAlias|processRoomoveAudioNoAlias)\s*\(([^)]*)\)"
+        r"^\s*(?:[\w:<>]+\s+)+[\*&\s]*(roomoveDspStateProcessAudioNoAlias|processRoomoveAudioNoAlias)\s*\(([^)]*)\)\s*(?:;|\{)",
+        flags=re.MULTILINE,
     )
     for source in source_files:
         path = pathlib.Path(source).resolve()
