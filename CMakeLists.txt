@@ -28,80 +28,150 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
 
 else()
     # ---------------------------------------------------
-    # 2. HOST WORLD (NATIVE MSVC COMPILER)
+    # 2. HOST WORLD (NATIVE COMPILER + JUCE)
     # ---------------------------------------------------
-    message(STATUS "--- Configuring Native Plugin (MSVC + JUCE) ---")
-    
     set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
-    # --- JUCE TRIPLE-CHECK LOGIC ---
-    # 1. CHECK FOR "BAKED" INSTALL (Fastest - seconds)
-    find_package(JUCE CONFIG QUIET PATHS "C:/JUCE_Installed/lib/cmake/JUCE-8.0.12")
-    if(JUCE_FOUND)
-        message(STATUS "SUCCESS: Using Pre-Built JUCE at ${JUCE_DIR}")
-        set(JUCE_BUILD_HELPER_TOOLS OFF CACHE BOOL "" FORCE)
-        
-    # 2. CHECK FOR LOCAL SOURCE (Medium - minutes)
-    elseif(EXISTS "C:/JUCE/CMakeLists.txt")
-        message(STATUS "NOTICE: Pre-Built JUCE not found. Building from local source at C:/JUCE...")
-        add_subdirectory("C:/JUCE" JUCE)
-        
-    # 3. CLOUD FALLBACK (Slowest - "The Glacier")
+    if(APPLE)
+        # -----------------------------------------------
+        # macOS – Standalone build (arm64 / Apple Silicon)
+        # -----------------------------------------------
+        message(STATUS "--- Configuring macOS Standalone Plugin (Clang + JUCE) ---")
+
+        # JUCE discovery: honour an explicit -DJUCE_DIR=<path> first,
+        # then try the default installer location, then fall back to FetchContent.
+        find_package(JUCE CONFIG QUIET
+            PATHS
+                "${JUCE_DIR}"
+                "/Applications/JUCE/lib/cmake/JUCE-8.0.12"
+                "/opt/homebrew/lib/cmake/JUCE-8.0.12"
+        )
+        if(JUCE_FOUND)
+            message(STATUS "SUCCESS: Using Pre-Built JUCE at ${JUCE_DIR}")
+            set(JUCE_BUILD_HELPER_TOOLS OFF CACHE BOOL "" FORCE)
+        elseif(EXISTS "/Applications/JUCE/CMakeLists.txt")
+            message(STATUS "NOTICE: Building JUCE from /Applications/JUCE source...")
+            add_subdirectory("/Applications/JUCE" JUCE)
+        else()
+            message(STATUS "WARNING: No local JUCE found. Downloading from GitHub...")
+            include(FetchContent)
+            FetchContent_Declare(JUCE
+                GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+                GIT_TAG        8.0.12
+            )
+            FetchContent_MakeAvailable(JUCE)
+        endif()
+
+        juce_add_plugin(Roomove
+            COPY_PLUGIN_AFTER_BUILD  FALSE
+            PLUGIN_MANUFACTURER_CODE Cftp
+            PLUGIN_CODE              Rmov
+            FORMATS                  Standalone
+            PLUGIN_CATEGORIES        Dynamics Effect
+            BUNDLE_ID                "com.chrisfromthepast.Roomove"
+            PRODUCT_NAME             "Roomove"
+        )
+
+        juce_generate_juce_header(Roomove)
+
+        target_sources(Roomove
+            PRIVATE
+                app/PluginEditor.cpp
+                app/PluginEditor.h
+                app/PluginProcessor.cpp
+                app/PluginProcessor.h
+                dsp/RoomoveDSP.cpp
+        )
+
+        target_compile_definitions(Roomove
+            PUBLIC
+                JUCE_WEB_BROWSER=0
+                JUCE_USE_CURL=0
+                JUCE_VST3_CAN_REPLACE_VST2=0
+        )
+
+        target_link_libraries(Roomove
+            PRIVATE
+                juce::juce_audio_utils
+            PUBLIC
+                juce::juce_recommended_config_flags
+                juce::juce_recommended_lto_flags
+                juce::juce_recommended_warning_flags
+        )
+
     else()
-        message(STATUS "WARNING: No local JUCE found. Downloading from GitHub...")
-        include(FetchContent)
-        FetchContent_Declare(JUCE GIT_REPOSITORY https://github.com/juce-framework/JUCE.git GIT_TAG 7.0.9)
-        FetchContent_MakeAvailable(JUCE)
+        # -----------------------------------------------
+        # Windows – AAX build (MSVC + JUCE)
+        # -----------------------------------------------
+        message(STATUS "--- Configuring Native Plugin (MSVC + JUCE) ---")
+
+        # --- JUCE TRIPLE-CHECK LOGIC ---
+        # 1. CHECK FOR "BAKED" INSTALL (Fastest - seconds)
+        find_package(JUCE CONFIG QUIET PATHS "C:/JUCE_Installed/lib/cmake/JUCE-8.0.12")
+        if(JUCE_FOUND)
+            message(STATUS "SUCCESS: Using Pre-Built JUCE at ${JUCE_DIR}")
+            set(JUCE_BUILD_HELPER_TOOLS OFF CACHE BOOL "" FORCE)
+
+        # 2. CHECK FOR LOCAL SOURCE (Medium - minutes)
+        elseif(EXISTS "C:/JUCE/CMakeLists.txt")
+            message(STATUS "NOTICE: Pre-Built JUCE not found. Building from local source at C:/JUCE...")
+            add_subdirectory("C:/JUCE" JUCE)
+
+        # 3. CLOUD FALLBACK (Slowest - "The Glacier")
+        else()
+            message(STATUS "WARNING: No local JUCE found. Downloading from GitHub...")
+            include(FetchContent)
+            FetchContent_Declare(JUCE GIT_REPOSITORY https://github.com/juce-framework/JUCE.git GIT_TAG 8.0.12)
+            FetchContent_MakeAvailable(JUCE)
+        endif()
+
+        set(AAX_SDK_PATH "C:/SDKs/AAX-SDK")
+        juce_set_aax_sdk_path("${AAX_SDK_PATH}")
+
+        # Configure AAX DSP support if AAX_DSP_TYPE is provided
+        if(DEFINED AAX_DSP_TYPE)
+            message(STATUS "AAX DSP Type configured: ${AAX_DSP_TYPE}")
+            set(AAX_DSP_ENABLED ON)
+        else()
+            set(AAX_DSP_ENABLED OFF)
+        endif()
+
+        juce_add_plugin(Roomove_AAX
+            COPY_PLUGIN_AFTER_BUILD TRUE
+            PLUGIN_MANUFACTURER_CODE Cftp
+            PLUGIN_CODE              Rmov
+            FORMATS                  AAX
+            PLUGIN_CATEGORIES        Dynamics Effect
+            AAX_IDENTIFIER           "com.chrisfromthepast.Roomove"
+            PRODUCT_NAME             "Roomove"
+        )
+
+        juce_generate_juce_header(Roomove_AAX)
+
+        target_sources(Roomove_AAX
+            PRIVATE
+                app/PluginEditor.cpp
+                app/PluginEditor.h
+                app/PluginProcessor.cpp
+                app/PluginProcessor.h
+                dsp/RoomoveDSP.cpp
+        )
+
+        target_compile_definitions(Roomove_AAX
+            PUBLIC
+                JUCE_WEB_BROWSER=0
+                JUCE_USE_CURL=0
+                JUCE_VST3_CAN_REPLACE_VST2=0
+        )
+
+        target_link_libraries(Roomove_AAX
+            PRIVATE
+                juce::juce_audio_utils
+            PUBLIC
+                juce::juce_recommended_config_flags
+                juce::juce_recommended_lto_flags
+                juce::juce_recommended_warning_flags
+        )
     endif()
-
-    set(AAX_SDK_PATH "C:/SDKs/AAX-SDK") 
-    juce_set_aax_sdk_path("${AAX_SDK_PATH}")
-
-    # Configure AAX DSP support if AAX_DSP_TYPE is provided
-    if(DEFINED AAX_DSP_TYPE)
-        message(STATUS "AAX DSP Type configured: ${AAX_DSP_TYPE}")
-        set(AAX_DSP_ENABLED ON)
-    else()
-        set(AAX_DSP_ENABLED OFF)
-    endif()
-
-    # I changed the target name to Roomove_AAX to match your manual.yaml build steps!
-juce_add_plugin(Roomove_AAX
-        # ... your other settings ...
-        COPY_PLUGIN_AFTER_BUILD TRUE   # <--- CHANGE TO TRUE
-        PLUGIN_MANUFACTURER_CODE Cftp
-        PLUGIN_CODE             Rmov
-        FORMATS                 AAX
-        PLUGIN_CATEGORIES Dynamics Effect
-        AAX_IDENTIFIER          "com.chrisfromthepast.Roomove" # Add this for better ID tracking
-        PRODUCT_NAME            "Roomove"
-    )
-
-    juce_generate_juce_header(Roomove_AAX)
-
-    target_sources(Roomove_AAX
-        PRIVATE
-            app/PluginEditor.cpp
-            app/PluginEditor.h
-            app/PluginProcessor.cpp
-            app/PluginProcessor.h
-            dsp/RoomoveDSP.cpp
-    )
-
-    target_compile_definitions(Roomove_AAX
-        PUBLIC
-            JUCE_WEB_BROWSER=0
-            JUCE_USE_CURL=0
-            JUCE_VST3_CAN_REPLACE_VST2=0
-    )
-
-    target_link_libraries(Roomove_AAX
-        PRIVATE
-            juce::juce_audio_utils
-        PUBLIC
-            juce::juce_recommended_config_flags
-            juce::juce_recommended_lto_flags
-            juce::juce_recommended_warning_flags
-    )
 endif()
