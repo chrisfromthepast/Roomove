@@ -1,0 +1,121 @@
+name: Release Mac ARM Standalone
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 0.1.0)'
+        required: true
+        default: '0.1.0'
+      juce_dir:
+        description: 'Absolute path to JUCE cmake dir on runner (leave blank to auto-detect)'
+        required: false
+        default: ''
+
+jobs:
+  build-mac-arm-standalone:
+    runs-on: [self-hosted, macos, arm64]
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. SOURCE
+      # ------------------------------------------------------------------
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          clean: true
+
+      # ------------------------------------------------------------------
+      # 2. CLEAN
+      # ------------------------------------------------------------------
+      - name: Clean Previous Build
+        run: rm -rf build_standalone
+
+      # ------------------------------------------------------------------
+      # 3. CONFIGURE
+      # Passes JUCE_DIR only when the user supplied one; otherwise
+      # CMakeLists.txt auto-discovers JUCE from default install paths
+      # or fetches it from GitHub.
+      # ------------------------------------------------------------------
+      - name: Configure CMake for ARM64 Standalone
+        run: |
+          EXTRA_FLAGS=""
+          if [ -n "${{ github.event.inputs.juce_dir }}" ]; then
+            EXTRA_FLAGS="-DJUCE_DIR=${{ github.event.inputs.juce_dir }}"
+          fi
+
+          cmake -S . -B build_standalone \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            $EXTRA_FLAGS
+
+      # ------------------------------------------------------------------
+      # 4. BUILD
+      # ------------------------------------------------------------------
+      - name: Build Standalone Target
+        run: |
+          cmake --build build_standalone \
+            --config Release \
+            --target Roomove_Standalone \
+            --parallel $(sysctl -n hw.logicalcpu)
+
+      # ------------------------------------------------------------------
+      # 5. LOCATE APP BUNDLE
+      # JUCE places the .app under:
+      #   build_standalone/Roomove_artefacts/Release/Standalone/Roomove.app
+      # The find command handles any variation in the output path.
+      # ------------------------------------------------------------------
+      - name: Locate App Bundle
+        run: |
+          APP=$(find build_standalone -name "Roomove.app" -maxdepth 8 -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "ERROR: Roomove.app not found inside build_standalone!"
+            echo "--- Directory listing for diagnosis ---"
+            find build_standalone -maxdepth 5 | sort
+            exit 1
+          fi
+          echo "Found app bundle: $APP"
+          echo "APP_PATH=$APP" >> "$GITHUB_ENV"
+
+      # ------------------------------------------------------------------
+      # 6. PACKAGE
+      # ------------------------------------------------------------------
+      - name: Package App as Zip
+        run: |
+          APP_DIR=$(dirname "$APP_PATH")
+          ZIP_NAME="Roomove-${{ github.event.inputs.version }}-mac-arm64-standalone.zip"
+          cd "$APP_DIR"
+          zip -r "$ZIP_NAME" "Roomove.app"
+          echo "ZIP_PATH=$APP_DIR/$ZIP_NAME" >> "$GITHUB_ENV"
+          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
+          echo "Packaged: $APP_DIR/$ZIP_NAME"
+
+      # ------------------------------------------------------------------
+      # 7. UPLOAD ARTIFACT (always available in the Actions run)
+      # ------------------------------------------------------------------
+      - name: Upload Standalone Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Roomove-mac-arm64-standalone-${{ github.event.inputs.version }}
+          path: ${{ env.ZIP_PATH }}
+          if-no-files-found: error
+
+      # ------------------------------------------------------------------
+      # 8. CREATE GITHUB RELEASE (tags + attaches the zip)
+      # ------------------------------------------------------------------
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ github.event.inputs.version }}-mac-arm64"
+          TITLE="Roomove ${{ github.event.inputs.version }} — Mac ARM64 Standalone"
+
+          # Create (or update) the release tag and upload the zip
+          gh release create "$TAG" "${{ env.ZIP_PATH }}" \
+            --title "$TITLE" \
+            --notes "Standalone build for Apple Silicon (arm64). macOS 12.0+." \
+            --repo "${{ github.repository }}" \
+            || gh release upload "$TAG" "${{ env.ZIP_PATH }}" \
+                 --repo "${{ github.repository }}" --clobber
