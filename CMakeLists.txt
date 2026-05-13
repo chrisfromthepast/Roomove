@@ -45,12 +45,16 @@ else()
         find_package(JUCE CONFIG QUIET
             PATHS
                 "${JUCE_DIR}"
+                "/Users/chris/juce-install/lib/cmake/JUCE-8.0.12"
                 "/Applications/JUCE/lib/cmake/JUCE-8.0.12"
                 "/opt/homebrew/lib/cmake/JUCE-8.0.12"
         )
         if(JUCE_FOUND)
             message(STATUS "SUCCESS: Using Pre-Built JUCE at ${JUCE_DIR}")
             set(JUCE_BUILD_HELPER_TOOLS OFF CACHE BOOL "" FORCE)
+        elseif(EXISTS "/Users/chris/juce-install/CMakeLists.txt")
+            message(STATUS "NOTICE: Building JUCE from /Users/chris/juce-install source...")
+            add_subdirectory("/Users/chris/juce-install" JUCE)
         elseif(EXISTS "/Applications/JUCE/CMakeLists.txt")
             message(STATUS "NOTICE: Building JUCE from /Applications/JUCE source...")
             add_subdirectory("/Applications/JUCE" JUCE)
