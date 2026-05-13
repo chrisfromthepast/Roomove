@@ -52,10 +52,6 @@ else()
         endif()
 
         list(APPEND _juce_search_paths
-            "/Users/chris/juce-install/lib/cmake"
-            "/Users/chris/juce-install/lib/cmake/JUCE-8.0.2"
-            "/Users/chrisw/juce-install/lib/cmake"
-            "/Users/chrisw/juce-install/lib/cmake/JUCE-8.0.2"
             "/Applications/JUCE/lib/cmake"
             "/Applications/JUCE/lib/cmake/JUCE-8.0.12"
             "/opt/homebrew/lib/cmake"
@@ -100,8 +96,6 @@ else()
             set(JUCE_BUILD_HELPER_TOOLS OFF CACHE BOOL "" FORCE)
         else()
             set(_juce_source_paths
-                "/Users/chris/juce-install"
-                "/Users/chrisw/juce-install"
                 "/Applications/JUCE"
             )
             file(GLOB _juce_globbed_source_paths
