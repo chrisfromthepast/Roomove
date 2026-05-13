@@ -91,13 +91,3 @@ jobs:
           echo "ZIP_PATH=$APP_DIR/$ZIP_NAME" >> "$GITHUB_ENV"
           echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
           echo "Packaged: $APP_DIR/$ZIP_NAME"
-
-      # ------------------------------------------------------------------
-      # 7. UPLOAD ARTIFACT (always available in the Actions run)
-      # ------------------------------------------------------------------
-      - name: Upload Standalone Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Roomove-mac-arm64-standalone-${{ github.event.inputs.version }}
-          path: ${{ env.ZIP_PATH }}
-          if-no-files-found: error
