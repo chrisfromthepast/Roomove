@@ -44,15 +44,28 @@ jobs:
           if [ -n "${{ github.event.inputs.juce_dir }}" ]; then
             EXTRA_FLAGS="-DJUCE_DIR=${{ github.event.inputs.juce_dir }}"
           else
-            RESOLVED_JUCE_DIR="$(ls -d \
+            RESOLVED_JUCE_DIR=""
+            JUCE_CANDIDATES=()
+            shopt -s nullglob
+            for MATCH in \
               "$HOME"/juce-install/lib/cmake/JUCE-* \
               "$HOME"/JUCE*/lib/cmake/JUCE-* \
-              /Users/*/juce-install/lib/cmake/JUCE-* \
-              /Users/*/JUCE*/lib/cmake/JUCE-* \
               /Applications/JUCE*/lib/cmake/JUCE-* \
               /opt/homebrew/lib/cmake/JUCE-* \
-              /usr/local/lib/cmake/JUCE-* \
-              2>/dev/null | sort -Vr | head -1)"
+              /usr/local/lib/cmake/JUCE-*; do
+              if [ -d "$MATCH" ]; then
+                JUCE_CANDIDATES+=("$MATCH")
+              fi
+            done
+            shopt -u nullglob
+            if [ "${#JUCE_CANDIDATES[@]}" -gt 0 ]; then
+              RESOLVED_JUCE_DIR="${JUCE_CANDIDATES[0]}"
+              if [ "${#JUCE_CANDIDATES[@]}" -gt 1 ]; then
+                echo "Detected multiple JUCE package directories; selecting first match:"
+                printf ' - %s\n' "${JUCE_CANDIDATES[@]}"
+                echo "Selected JUCE_DIR=$RESOLVED_JUCE_DIR"
+              fi
+            fi
             if [ -n "$RESOLVED_JUCE_DIR" ]; then
               echo "Auto-detected JUCE_DIR=$RESOLVED_JUCE_DIR"
               EXTRA_FLAGS="-DJUCE_DIR=$RESOLVED_JUCE_DIR"
