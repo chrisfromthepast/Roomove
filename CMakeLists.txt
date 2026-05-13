@@ -52,6 +52,8 @@ else()
         endif()
 
         list(APPEND _juce_search_paths
+            "$ENV{HOME}/juce-install/lib/cmake"
+            "$ENV{HOME}/JUCE/lib/cmake"
             "/Applications/JUCE/lib/cmake"
             "/Applications/JUCE/lib/cmake/JUCE-8.0.12"
             "/opt/homebrew/lib/cmake"
@@ -59,17 +61,6 @@ else()
             "/usr/local/lib/cmake"
         )
 
-        file(GLOB _juce_globbed_cmake_dirs
-            "/Users/*/juce-install/lib/cmake"
-            "/Users/*/juce-install/lib/cmake/JUCE-*"
-            "/Users/*/JUCE*/lib/cmake"
-            "/Users/*/JUCE*/lib/cmake/JUCE-*"
-            "/Applications/JUCE*/lib/cmake"
-            "/Applications/JUCE*/lib/cmake/JUCE-*"
-            "/opt/homebrew/lib/cmake/JUCE-*"
-            "/usr/local/lib/cmake/JUCE-*"
-        )
-        list(APPEND _juce_search_paths ${_juce_globbed_cmake_dirs})
         list(REMOVE_DUPLICATES _juce_search_paths)
 
         set(_juce_found_search_path "")
@@ -78,11 +69,37 @@ else()
                 find_package(JUCE CONFIG QUIET PATHS "${_juce_path}" NO_DEFAULT_PATH)
                 if(JUCE_FOUND)
                     set(_juce_found_search_path "${_juce_path}")
-                    set(JUCE_DIR "${_juce_path}" CACHE PATH "Path to JUCE config package" FORCE)
+                    set(JUCE_DIR "${_juce_path}" CACHE PATH "Path to JUCE config package")
                     break()
                 endif()
             endif()
         endforeach()
+
+        if(NOT JUCE_FOUND)
+            file(GLOB _juce_globbed_cmake_dirs
+                "/Users/*/juce-install/lib/cmake"
+                "/Users/*/juce-install/lib/cmake/JUCE-*"
+                "/Users/*/JUCE*/lib/cmake"
+                "/Users/*/JUCE*/lib/cmake/JUCE-*"
+                "/Applications/JUCE*/lib/cmake"
+                "/Applications/JUCE*/lib/cmake/JUCE-*"
+                "/opt/homebrew/lib/cmake/JUCE-*"
+                "/usr/local/lib/cmake/JUCE-*"
+            )
+            list(APPEND _juce_search_paths ${_juce_globbed_cmake_dirs})
+            list(REMOVE_DUPLICATES _juce_search_paths)
+
+            foreach(_juce_path IN LISTS _juce_search_paths)
+                if(EXISTS "${_juce_path}")
+                    find_package(JUCE CONFIG QUIET PATHS "${_juce_path}" NO_DEFAULT_PATH)
+                    if(JUCE_FOUND)
+                        set(_juce_found_search_path "${_juce_path}")
+                        set(JUCE_DIR "${_juce_path}" CACHE PATH "Path to JUCE config package")
+                        break()
+                    endif()
+                endif()
+            endforeach()
+        endif()
 
         if(NOT JUCE_FOUND)
             find_package(JUCE CONFIG QUIET)
@@ -96,14 +113,10 @@ else()
             set(JUCE_BUILD_HELPER_TOOLS OFF CACHE BOOL "" FORCE)
         else()
             set(_juce_source_paths
+                "$ENV{HOME}/juce-install"
+                "$ENV{HOME}/JUCE"
                 "/Applications/JUCE"
             )
-            file(GLOB _juce_globbed_source_paths
-                "/Users/*/juce-install"
-                "/Users/*/JUCE*"
-                "/Applications/JUCE*"
-            )
-            list(APPEND _juce_source_paths ${_juce_globbed_source_paths})
             list(REMOVE_DUPLICATES _juce_source_paths)
 
             set(_juce_source_found OFF)
@@ -115,6 +128,25 @@ else()
                     break()
                 endif()
             endforeach()
+
+            if(NOT _juce_source_found)
+                file(GLOB _juce_globbed_source_paths
+                    "/Users/*/juce-install"
+                    "/Users/*/JUCE*"
+                    "/Applications/JUCE*"
+                )
+                list(APPEND _juce_source_paths ${_juce_globbed_source_paths})
+                list(REMOVE_DUPLICATES _juce_source_paths)
+
+                foreach(_juce_source_path IN LISTS _juce_source_paths)
+                    if(EXISTS "${_juce_source_path}/CMakeLists.txt")
+                        message(STATUS "NOTICE: Building JUCE from ${_juce_source_path} source...")
+                        add_subdirectory("${_juce_source_path}" JUCE)
+                        set(_juce_source_found ON)
+                        break()
+                    endif()
+                endforeach()
+            endif()
 
             if(NOT _juce_source_found)
                 message(STATUS "WARNING: No local JUCE found. Downloading from GitHub...")
