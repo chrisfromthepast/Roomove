@@ -45,7 +45,7 @@ else()
         find_package(JUCE CONFIG QUIET
             PATHS
                 "${JUCE_DIR}"
-                "/Users/chris/juce-install/lib/cmake/JUCE-8.0.12"
+                "/Users/chris/juce-install/lib/cmake/JUCE-8.0.2"
                 "/Applications/JUCE/lib/cmake/JUCE-8.0.12"
                 "/opt/homebrew/lib/cmake/JUCE-8.0.12"
         )
