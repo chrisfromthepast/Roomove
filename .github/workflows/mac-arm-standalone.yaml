@@ -43,6 +43,22 @@ jobs:
           EXTRA_FLAGS=""
           if [ -n "${{ github.event.inputs.juce_dir }}" ]; then
             EXTRA_FLAGS="-DJUCE_DIR=${{ github.event.inputs.juce_dir }}"
+          else
+            RESOLVED_JUCE_DIR="$(ls -d \
+              "$HOME"/juce-install/lib/cmake/JUCE-* \
+              "$HOME"/JUCE*/lib/cmake/JUCE-* \
+              /Users/*/juce-install/lib/cmake/JUCE-* \
+              /Users/*/JUCE*/lib/cmake/JUCE-* \
+              /Applications/JUCE*/lib/cmake/JUCE-* \
+              /opt/homebrew/lib/cmake/JUCE-* \
+              /usr/local/lib/cmake/JUCE-* \
+              2>/dev/null | sort -Vr | head -1)"
+            if [ -n "$RESOLVED_JUCE_DIR" ]; then
+              echo "Auto-detected JUCE_DIR=$RESOLVED_JUCE_DIR"
+              EXTRA_FLAGS="-DJUCE_DIR=$RESOLVED_JUCE_DIR"
+            else
+              echo "No explicit JUCE package directory auto-detected; using CMake auto-discovery fallback."
+            fi
           fi
 
           cmake -S . -B build_standalone \
