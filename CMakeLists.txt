@@ -46,9 +46,27 @@ else()
         set(_juce_search_paths)
         if(DEFINED JUCE_DIR AND NOT "${JUCE_DIR}" STREQUAL "")
             list(APPEND _juce_search_paths "${JUCE_DIR}")
+            if(IS_DIRECTORY "${JUCE_DIR}/lib/cmake")
+                list(APPEND _juce_search_paths "${JUCE_DIR}/lib/cmake")
+            endif()
+            file(GLOB _juce_input_globbed_cmake_dirs
+                "${JUCE_DIR}/lib/cmake/JUCE-*"
+                "${JUCE_DIR}/JUCE-*/lib/cmake"
+                "${JUCE_DIR}/JUCE-*/lib/cmake/JUCE-*"
+            )
+            list(APPEND _juce_search_paths ${_juce_input_globbed_cmake_dirs})
         endif()
         if(DEFINED ENV{JUCE_DIR} AND NOT "$ENV{JUCE_DIR}" STREQUAL "")
             list(APPEND _juce_search_paths "$ENV{JUCE_DIR}")
+            if(IS_DIRECTORY "$ENV{JUCE_DIR}/lib/cmake")
+                list(APPEND _juce_search_paths "$ENV{JUCE_DIR}/lib/cmake")
+            endif()
+            file(GLOB _juce_env_globbed_cmake_dirs
+                "$ENV{JUCE_DIR}/lib/cmake/JUCE-*"
+                "$ENV{JUCE_DIR}/JUCE-*/lib/cmake"
+                "$ENV{JUCE_DIR}/JUCE-*/lib/cmake/JUCE-*"
+            )
+            list(APPEND _juce_search_paths ${_juce_env_globbed_cmake_dirs})
         endif()
 
         list(APPEND _juce_search_paths
