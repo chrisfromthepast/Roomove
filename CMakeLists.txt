@@ -40,32 +40,97 @@ else()
         # -----------------------------------------------
         message(STATUS "--- Configuring macOS Standalone Plugin (Clang + JUCE) ---")
 
-        # JUCE discovery: honour an explicit -DJUCE_DIR=<path> first,
-        # then try the default installer location, then fall back to FetchContent.
-        find_package(JUCE CONFIG QUIET
-            PATHS
-                "${JUCE_DIR}"
-                "/Users/chris/juce-install/lib/cmake/JUCE-8.0.2"
-                "/Applications/JUCE/lib/cmake/JUCE-8.0.12"
-                "/opt/homebrew/lib/cmake/JUCE-8.0.12"
+        # JUCE discovery: honour explicit JUCE_DIR first, then search common
+        # local install locations (including wildcard user paths), then fall
+        # back to FetchContent only if no local package/source is found.
+        set(_juce_search_paths)
+        if(DEFINED JUCE_DIR AND NOT "${JUCE_DIR}" STREQUAL "")
+            list(APPEND _juce_search_paths "${JUCE_DIR}")
+        endif()
+        if(DEFINED ENV{JUCE_DIR} AND NOT "$ENV{JUCE_DIR}" STREQUAL "")
+            list(APPEND _juce_search_paths "$ENV{JUCE_DIR}")
+        endif()
+
+        list(APPEND _juce_search_paths
+            "/Users/chris/juce-install/lib/cmake"
+            "/Users/chris/juce-install/lib/cmake/JUCE-8.0.2"
+            "/Users/chrisw/juce-install/lib/cmake"
+            "/Users/chrisw/juce-install/lib/cmake/JUCE-8.0.2"
+            "/Applications/JUCE/lib/cmake"
+            "/Applications/JUCE/lib/cmake/JUCE-8.0.12"
+            "/opt/homebrew/lib/cmake"
+            "/opt/homebrew/lib/cmake/JUCE-8.0.12"
+            "/usr/local/lib/cmake"
         )
+
+        file(GLOB _juce_globbed_cmake_dirs
+            "/Users/*/juce-install/lib/cmake"
+            "/Users/*/juce-install/lib/cmake/JUCE-*"
+            "/Users/*/JUCE*/lib/cmake"
+            "/Users/*/JUCE*/lib/cmake/JUCE-*"
+            "/Applications/JUCE*/lib/cmake"
+            "/Applications/JUCE*/lib/cmake/JUCE-*"
+            "/opt/homebrew/lib/cmake/JUCE-*"
+            "/usr/local/lib/cmake/JUCE-*"
+        )
+        list(APPEND _juce_search_paths ${_juce_globbed_cmake_dirs})
+        list(REMOVE_DUPLICATES _juce_search_paths)
+
+        set(_juce_found_search_path "")
+        foreach(_juce_path IN LISTS _juce_search_paths)
+            if(EXISTS "${_juce_path}")
+                find_package(JUCE CONFIG QUIET PATHS "${_juce_path}" NO_DEFAULT_PATH)
+                if(JUCE_FOUND)
+                    set(_juce_found_search_path "${_juce_path}")
+                    set(JUCE_DIR "${_juce_path}" CACHE PATH "Path to JUCE config package" FORCE)
+                    break()
+                endif()
+            endif()
+        endforeach()
+
+        if(NOT JUCE_FOUND)
+            find_package(JUCE CONFIG QUIET)
+            if(JUCE_FOUND AND DEFINED JUCE_DIR)
+                set(_juce_found_search_path "${JUCE_DIR}")
+            endif()
+        endif()
+
         if(JUCE_FOUND)
-            message(STATUS "SUCCESS: Using Pre-Built JUCE at ${JUCE_DIR}")
+            message(STATUS "SUCCESS: Using Pre-Built JUCE at ${_juce_found_search_path}")
             set(JUCE_BUILD_HELPER_TOOLS OFF CACHE BOOL "" FORCE)
-        elseif(EXISTS "/Users/chris/juce-install/CMakeLists.txt")
-            message(STATUS "NOTICE: Building JUCE from /Users/chris/juce-install source...")
-            add_subdirectory("/Users/chris/juce-install" JUCE)
-        elseif(EXISTS "/Applications/JUCE/CMakeLists.txt")
-            message(STATUS "NOTICE: Building JUCE from /Applications/JUCE source...")
-            add_subdirectory("/Applications/JUCE" JUCE)
         else()
-            message(STATUS "WARNING: No local JUCE found. Downloading from GitHub...")
-            include(FetchContent)
-            FetchContent_Declare(JUCE
-                GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-                GIT_TAG        8.0.12
+            set(_juce_source_paths
+                "/Users/chris/juce-install"
+                "/Users/chrisw/juce-install"
+                "/Applications/JUCE"
             )
-            FetchContent_MakeAvailable(JUCE)
+            file(GLOB _juce_globbed_source_paths
+                "/Users/*/juce-install"
+                "/Users/*/JUCE*"
+                "/Applications/JUCE*"
+            )
+            list(APPEND _juce_source_paths ${_juce_globbed_source_paths})
+            list(REMOVE_DUPLICATES _juce_source_paths)
+
+            set(_juce_source_found OFF)
+            foreach(_juce_source_path IN LISTS _juce_source_paths)
+                if(EXISTS "${_juce_source_path}/CMakeLists.txt")
+                    message(STATUS "NOTICE: Building JUCE from ${_juce_source_path} source...")
+                    add_subdirectory("${_juce_source_path}" JUCE)
+                    set(_juce_source_found ON)
+                    break()
+                endif()
+            endforeach()
+
+            if(NOT _juce_source_found)
+                message(STATUS "WARNING: No local JUCE found. Downloading from GitHub...")
+                include(FetchContent)
+                FetchContent_Declare(JUCE
+                    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+                    GIT_TAG        8.0.12
+                )
+                FetchContent_MakeAvailable(JUCE)
+            endif()
         endif()
 
         juce_add_plugin(Roomove
