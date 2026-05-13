@@ -8,6 +8,7 @@ RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& processor)
     armorStrengthFader.setLookAndFeel (&machinedLookAndFeel);
     addAndMakeVisible (armorStrengthFader);
 
+    jassert (processor.apvts.getParameter (RoomoveParameterIds::armorStrength) != nullptr);
     strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         processor.apvts,
         RoomoveParameterIds::armorStrength,
@@ -18,7 +19,6 @@ RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& processor)
 
 RoomoveAudioEditor::~RoomoveAudioEditor()
 {
-    strengthAttachment.reset();
     armorStrengthFader.setLookAndFeel (nullptr);
 }
 
