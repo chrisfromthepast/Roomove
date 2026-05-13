@@ -1,5 +1,32 @@
 #include "PluginEditor.h"
 
+RoomoveAudioEditor::RoomoveAudioEditor (ArmorAudioProcessor& processor)
+    : AudioProcessorEditor (&processor)
+{
+    armorStrengthFader.setSliderStyle (juce::Slider::LinearVertical);
+    armorStrengthFader.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    armorStrengthFader.setLookAndFeel (&machinedLookAndFeel);
+    addAndMakeVisible (armorStrengthFader);
+
+    jassert (processor.apvts.getParameter (RoomoveParameterIds::armorStrength) != nullptr);
+    strengthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        processor.apvts,
+        RoomoveParameterIds::armorStrength,
+        armorStrengthFader);
+
+    setSize (220, 320);
+}
+
+RoomoveAudioEditor::~RoomoveAudioEditor()
+{
+    armorStrengthFader.setLookAndFeel (nullptr);
+}
+
+void RoomoveAudioEditor::resized()
+{
+    armorStrengthFader.setBounds (getLocalBounds().reduced (70, 24));
+}
+
 void MachinedFaderLookAndFeel::drawLinearSlider (juce::Graphics& g,
                                                  int x,
                                                  int y,
