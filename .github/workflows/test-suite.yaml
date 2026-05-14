@@ -1,0 +1,135 @@
+name: Roomove Test Suite
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      test_filter:
+        description: 'CTest -R regex to run a subset of tests (blank = run all)'
+        required: false
+        default: ''
+      test_label:
+        description: 'CTest -L label to isolate a category: dsp | realtime | hygiene (blank = all)'
+        required: false
+        default: ''
+      juce_dir:
+        description: 'Absolute path to JUCE cmake dir on runner (blank = auto-detect)'
+        required: false
+        default: ''
+
+concurrency:
+  group: test-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-mac-arm:
+    name: Test Suite (macOS ARM)
+    # 'x64' is the registered label for the Apple Silicon self-hosted runner;
+    # the actual build target is arm64 (set via CMAKE_OSX_ARCHITECTURES below).
+    # This matches the label used in mac-arm-standalone.yaml.
+    runs-on: [self-hosted, macos, x64]
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1. SOURCE
+      # ------------------------------------------------------------------
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          clean: true
+
+      # ------------------------------------------------------------------
+      # 2. CLEAN
+      # ------------------------------------------------------------------
+      - name: Clean Previous Build
+        run: rm -rf build_tests
+
+      # ------------------------------------------------------------------
+      # 3. CONFIGURE
+      # Reuses the same JUCE auto-discovery logic as mac-arm-standalone.yaml.
+      # Only test targets will be compiled; the full plugin is not built.
+      # ------------------------------------------------------------------
+      - name: Configure CMake for Test Build
+        run: |
+          EXTRA_FLAGS=""
+          if [ -n "${{ github.event.inputs.juce_dir }}" ]; then
+            EXTRA_FLAGS="-DJUCE_DIR=${{ github.event.inputs.juce_dir }}"
+          else
+            RESOLVED_JUCE_DIR=""
+            JUCE_CANDIDATES=()
+            shopt -s nullglob
+            for MATCH in \
+              "$HOME"/juce-install/lib/cmake/JUCE-* \
+              "$HOME"/JUCE*/lib/cmake/JUCE-* \
+              /Applications/JUCE*/lib/cmake/JUCE-* \
+              /opt/homebrew/lib/cmake/JUCE-* \
+              /usr/local/lib/cmake/JUCE-*; do
+              if [ -d "$MATCH" ]; then
+                JUCE_CANDIDATES+=("$MATCH")
+              fi
+            done
+            shopt -u nullglob
+            if [ "${#JUCE_CANDIDATES[@]}" -gt 0 ]; then
+              RESOLVED_JUCE_DIR="${JUCE_CANDIDATES[0]}"
+              if [ "${#JUCE_CANDIDATES[@]}" -gt 1 ]; then
+                echo "Detected multiple JUCE package directories; selecting first match:"
+                printf ' - %s\n' "${JUCE_CANDIDATES[@]}"
+              fi
+              echo "Auto-detected JUCE_DIR=$RESOLVED_JUCE_DIR"
+              EXTRA_FLAGS="-DJUCE_DIR=$RESOLVED_JUCE_DIR"
+            else
+              echo "No explicit JUCE package directory auto-detected; using CMake auto-discovery fallback."
+            fi
+          fi
+
+          cmake -S . -B build_tests \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -DROOMOVE_ENABLE_VALIDATION_TESTS=ON \
+            $EXTRA_FLAGS
+
+      # ------------------------------------------------------------------
+      # 4. BUILD TEST TARGETS
+      # roomove_all_tests pulls in Roomove_DspSeamTests and, when JUCE is
+      # available, Roomove_ValidationTests — without building the plugin.
+      # ------------------------------------------------------------------
+      - name: Build Test Targets
+        run: |
+          cmake --build build_tests \
+            --config Release \
+            --target roomove_all_tests \
+            --parallel $(sysctl -n hw.logicalcpu)
+
+      # ------------------------------------------------------------------
+      # 5. RUN TEST SUITE
+      # Supports optional -R (name filter) and -L (label/category filter).
+      # --label-summary prints a per-category pass/fail table for readability.
+      # JUnit XML is written to test-results.xml for artifact upload.
+      # ------------------------------------------------------------------
+      - name: Run Test Suite
+        run: |
+          cd build_tests
+          CTEST_ARGS="--output-on-failure --label-summary --output-junit=../test-results.xml"
+          if [ -n "${{ github.event.inputs.test_filter }}" ]; then
+            CTEST_ARGS="$CTEST_ARGS -R ${{ github.event.inputs.test_filter }}"
+          fi
+          if [ -n "${{ github.event.inputs.test_label }}" ]; then
+            CTEST_ARGS="$CTEST_ARGS -L ${{ github.event.inputs.test_label }}"
+          fi
+          # shellcheck disable=SC2086
+          ctest $CTEST_ARGS
+
+      # ------------------------------------------------------------------
+      # 6. UPLOAD RESULTS (always — failures must be inspectable)
+      # ------------------------------------------------------------------
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-mac-arm
+          path: test-results.xml
+          if-no-files-found: ignore
