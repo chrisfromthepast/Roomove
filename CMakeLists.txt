@@ -302,6 +302,18 @@ else()
         add_test(NAME Roomove_ValidationTests COMMAND Roomove_ValidationTests)
     endif()
 
+    if(ROOMOVE_ENABLE_VALIDATION_TESTS)
+        enable_testing()
+        add_executable(Roomove_DspSeamTests
+            tests/DspSeamTests.cpp
+            dsp/RoomoveDSP.cpp
+        )
+        target_include_directories(Roomove_DspSeamTests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/dsp
+        )
+        add_test(NAME Roomove_DspSeamTests COMMAND Roomove_DspSeamTests)
+    endif()
+
     find_package(Python3 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
         add_custom_target(roomove_realtime_memory_hygiene
