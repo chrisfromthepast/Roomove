@@ -113,7 +113,7 @@ jobs:
       - name: Run Test Suite
         run: |
           cd build_tests
-          CTEST_ARGS="--output-on-failure --label-summary --output-junit=../test-results.xml"
+          CTEST_ARGS="--output-on-failure --output-junit=../test-results.xml"
           if [ -n "${{ github.event.inputs.test_filter }}" ]; then
             CTEST_ARGS="$CTEST_ARGS -R ${{ github.event.inputs.test_filter }}"
           fi
