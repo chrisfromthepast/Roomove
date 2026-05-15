@@ -14,7 +14,6 @@ namespace
     {
         std::string name;
         std::string body;
-        std::size_t startLine = 0;
     };
 
     bool assertCondition(bool condition, const std::string& message)
@@ -71,7 +70,6 @@ namespace
 
         result.name = token;
         result.body = text.substr(openBrace + 1, closeBrace - openBrace - 1);
-        result.startLine = text.substr(0, openBrace).find_last_of('\n');
         return true;
     }
 
@@ -101,7 +99,6 @@ namespace
             return assertCondition(false, "processBlock was not found in PluginProcessor.cpp");
 
         const std::vector<std::pair<std::string, std::string>> forbiddenAllocations{
-            { " new ", "dynamic allocation" },
             { "new ", "dynamic allocation" },
             { ".push_back", "container growth" },
             { ".emplace_back", "container growth" },
@@ -174,7 +171,6 @@ namespace
             return assertCondition(false, "Unable to open RoomoveDSP.cpp for realtime guardrail checks");
 
         const std::vector<std::pair<std::string, std::string>> forbiddenAllocations{
-            { " new ", "dynamic allocation" },
             { "new ", "dynamic allocation" },
             { ".push_back", "container growth" },
             { ".emplace_back", "container growth" },
