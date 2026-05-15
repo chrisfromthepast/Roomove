@@ -219,6 +219,21 @@ def _scan_forbidden(
 def run(plugin_processor_path: str) -> int:
     plugin_processor = Path(plugin_processor_path).resolve()
     repo_root = plugin_processor.parent.parent
+    dsp_source_path = repo_root / "dsp" / "RoomoveDSP.cpp"
+    validation_tests_path = repo_root / "tests" / "RealtimeValidationTests.cpp"
+
+    if not plugin_processor.exists():
+        print(
+            f"ERROR: plugin processor path does not exist: {plugin_processor}",
+            file=sys.stderr,
+        )
+        return 2
+    if not dsp_source_path.exists() or not validation_tests_path.exists():
+        print(
+            "ERROR: expected Roomove repository layout was not found next to PluginProcessor.cpp",
+            file=sys.stderr,
+        )
+        return 2
 
     try:
         source = _read_text(str(plugin_processor))
@@ -272,9 +287,6 @@ def run(plugin_processor_path: str) -> int:
         violations.append(
             "prepareToPlay should perform DSP state warmup before realtime processing"
         )
-
-    dsp_source_path = repo_root / "dsp" / "RoomoveDSP.cpp"
-    validation_tests_path = repo_root / "tests" / "RealtimeValidationTests.cpp"
 
     try:
         dsp_source = _read_text(str(dsp_source_path))

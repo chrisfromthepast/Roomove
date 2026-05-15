@@ -216,8 +216,6 @@ namespace
 
 int main()
 {
-    juce::ignoreUnused(sizeof(RoomoveDspState));
-
     bool ok = true;
     ok = testProcessBlockGuardrails() && ok;
     ok = testPrepareToPlayOwnsWarmupAllocation() && ok;
