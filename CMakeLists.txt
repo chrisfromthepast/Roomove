@@ -300,6 +300,7 @@ else()
             ROOMOVE_REPO_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
         )
         add_test(NAME Roomove_ValidationTests COMMAND Roomove_ValidationTests)
+        set_tests_properties(Roomove_ValidationTests PROPERTIES LABELS "realtime")
     endif()
 
     if(ROOMOVE_ENABLE_VALIDATION_TESTS)
@@ -312,6 +313,7 @@ else()
             ${CMAKE_CURRENT_SOURCE_DIR}/dsp
         )
         add_test(NAME Roomove_DspSeamTests COMMAND Roomove_DspSeamTests)
+        set_tests_properties(Roomove_DspSeamTests PROPERTIES LABELS "dsp")
     endif()
 
     find_package(Python3 COMPONENTS Interpreter QUIET)
@@ -327,5 +329,19 @@ else()
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_realtime_memory_hygiene.py"
                 --plugin-processor "${CMAKE_CURRENT_SOURCE_DIR}/app/PluginProcessor.cpp"
         )
+        set_tests_properties(roomove_realtime_memory_hygiene PROPERTIES LABELS "hygiene")
+    endif()
+
+    # ----------------------------------------------------------
+    # roomove_all_tests: convenience meta-target that builds all
+    # available test executables without building the full plugin.
+    # Use:  cmake --build <dir> --target roomove_all_tests
+    # ----------------------------------------------------------
+    if(ROOMOVE_ENABLE_VALIDATION_TESTS)
+        add_custom_target(roomove_all_tests)
+        add_dependencies(roomove_all_tests Roomove_DspSeamTests)
+        if(TARGET Roomove_ValidationTests)
+            add_dependencies(roomove_all_tests Roomove_ValidationTests)
+        endif()
     endif()
 endif()
