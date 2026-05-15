@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import argparse
-from pathlib import Path
 import re
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 
@@ -231,9 +231,7 @@ def run(plugin_processor_path: str) -> int:
         validation_tests_source = _read_text(str(validation_tests_path))
     except OSError:
         return 2
-    validation_tests_source_without_strings = _strip_string_literals(
-        validation_tests_source
-    )
+    stripped_validation_tests = _strip_string_literals(validation_tests_source)
 
     for function_name in (
         "roomoveDspStateProcessAudioNoAlias",
@@ -266,7 +264,7 @@ def run(plugin_processor_path: str) -> int:
         )
 
     for expression, description in FORBIDDEN_NONDETERMINISTIC_TEST_PATTERNS:
-        if re.search(expression, validation_tests_source_without_strings):
+        if re.search(expression, stripped_validation_tests):
             violations.append(
                 f"RealtimeValidationTests.cpp uses {description}, which makes CI assertions timing-sensitive"
             )
