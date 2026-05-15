@@ -67,35 +67,85 @@ def _read_text(path: str) -> str:
         raise
 
 
-def _strip_string_literals(text: str) -> str:
+def _strip_cpp_non_code(text: str) -> str:
     result: List[str] = []
-    in_string = False
-    escape = False
-    quote_char = ""
+    index = 0
 
-    for char in text:
-        if in_string:
-            if escape:
-                escape = False
-                result.append(" ")
-                continue
-            if char == "\\":
-                escape = True
-                result.append(" ")
-                continue
-            if char == quote_char:
-                in_string = False
-                quote_char = ""
+    while index < len(text):
+        char = text[index]
+        next_char = text[index + 1] if index + 1 < len(text) else ""
+
+        if char == "/" and next_char == "/":
             result.append(" ")
+            result.append(" ")
+            index += 2
+            while index < len(text) and text[index] != "\n":
+                result.append(" ")
+                index += 1
+            continue
+
+        if char == "/" and next_char == "*":
+            result.append(" ")
+            result.append(" ")
+            index += 2
+            while index < len(text):
+                current = text[index]
+                following = text[index + 1] if index + 1 < len(text) else ""
+                if current == "*" and following == "/":
+                    result.append(" ")
+                    result.append(" ")
+                    index += 2
+                    break
+                result.append("\n" if current == "\n" else " ")
+                index += 1
+            continue
+
+        if char == "R" and next_char == '"':
+            delimiter_start = index + 2
+            delimiter_end = text.find("(", delimiter_start)
+            if delimiter_end == -1:
+                result.append(char)
+                index += 1
+                continue
+
+            delimiter = text[delimiter_start:delimiter_end]
+            raw_terminator = ")" + delimiter + '"'
+            raw_end = text.find(raw_terminator, delimiter_end + 1)
+            if raw_end == -1:
+                result.append(char)
+                index += 1
+                continue
+
+            for raw_char in text[index : raw_end + len(raw_terminator)]:
+                result.append("\n" if raw_char == "\n" else " ")
+            index = raw_end + len(raw_terminator)
             continue
 
         if char in ('"', "'"):
-            in_string = True
             quote_char = char
             result.append(" ")
+            index += 1
+            escape = False
+            while index < len(text):
+                current = text[index]
+                if escape:
+                    escape = False
+                    result.append("\n" if current == "\n" else " ")
+                    index += 1
+                    continue
+                if current == "\\":
+                    escape = True
+                    result.append(" ")
+                    index += 1
+                    continue
+                result.append("\n" if current == "\n" else " ")
+                index += 1
+                if current == quote_char:
+                    break
             continue
 
         result.append(char)
+        index += 1
 
     return "".join(result)
 
@@ -231,7 +281,7 @@ def run(plugin_processor_path: str) -> int:
         validation_tests_source = _read_text(str(validation_tests_path))
     except OSError:
         return 2
-    stripped_validation_tests = _strip_string_literals(validation_tests_source)
+    stripped_validation_tests = _strip_cpp_non_code(validation_tests_source)
 
     for function_name in (
         "roomoveDspStateProcessAudioNoAlias",
@@ -264,9 +314,12 @@ def run(plugin_processor_path: str) -> int:
         )
 
     for expression, description in FORBIDDEN_NONDETERMINISTIC_TEST_PATTERNS:
-        if re.search(expression, stripped_validation_tests):
+        match = re.search(expression, stripped_validation_tests)
+        if match is not None:
+            line_number = stripped_validation_tests.count("\n", 0, match.start()) + 1
             violations.append(
-                f"RealtimeValidationTests.cpp uses {description}, which makes CI assertions timing-sensitive"
+                "RealtimeValidationTests.cpp "
+                f"(line {line_number}) uses {description}, which makes CI assertions timing-sensitive"
             )
 
     if violations:
