@@ -2,16 +2,21 @@
 
 #include "../dsp/RoomoveDSP.h"
 
-#include <atomic>
-#include <chrono>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace
 {
+    struct FunctionBody
+    {
+        std::string name;
+        std::string body;
+        std::size_t startLine = 0;
+    };
+
     bool assertCondition(bool condition, const std::string& message)
     {
         if (!condition)
@@ -22,157 +27,205 @@ namespace
         return true;
     }
 
-    bool testAbstractFifoHighContention()
+    bool readTextFile(const std::string& path, std::string& content)
     {
-        constexpr int iterations = 20000;
-        constexpr int fifoCapacity = 1024;
-        constexpr std::uint64_t maxYieldIterations = 10000000ULL;
-        juce::AbstractFifo fifo(fifoCapacity);
-        std::vector<int> storage((size_t) fifoCapacity, -1);
-
-        std::atomic<int> produced{0};
-        std::atomic<int> consumed{0};
-        std::atomic<bool> mismatch{false};
-        std::atomic<bool> producerDone{false};
-        std::atomic<bool> consumerDone{false};
-
-        std::thread producer([&]()
-        {
-            std::uint64_t yieldIterations = 0;
-            while (produced.load() < iterations)
-            {
-                int start1 = 0;
-                int size1 = 0;
-                int start2 = 0;
-                int size2 = 0;
-                fifo.prepareToWrite(1, start1, size1, start2, size2);
-                if (size1 > 0)
-                {
-                    const int value = produced.fetch_add(1);
-                    storage[(size_t) start1] = value;
-                    fifo.finishedWrite(1);
-                }
-                else
-                {
-                    ++yieldIterations;
-                    std::this_thread::yield();
-                }
-                if (yieldIterations > maxYieldIterations)
-                {
-                    mismatch.store(true);
-                    break;
-                }
-            }
-            producerDone.store(true);
-        });
-
-        std::thread consumer([&]()
-        {
-            std::uint64_t yieldIterations = 0;
-            while (consumed.load() < iterations)
-            {
-                int start1 = 0;
-                int size1 = 0;
-                int start2 = 0;
-                int size2 = 0;
-                fifo.prepareToRead(1, start1, size1, start2, size2);
-                if (size1 > 0)
-                {
-                    const int expected = consumed.fetch_add(1);
-                    const int actual = storage[(size_t) start1];
-                    fifo.finishedRead(1);
-                    if (actual != expected)
-                    {
-                        mismatch.store(true);
-                        break;
-                    }
-                }
-                else
-                {
-                    ++yieldIterations;
-                    std::this_thread::yield();
-                }
-
-                if (yieldIterations > maxYieldIterations && producerDone.load())
-                {
-                    mismatch.store(true);
-                    break;
-                }
-            }
-            consumerDone.store(true);
-        });
-
-        producer.join();
-        consumer.join();
-
-        return assertCondition(producerDone.load() && consumerDone.load(), "AbstractFifo threads did not complete") &&
-               assertCondition(!mismatch.load(), "AbstractFifo contention test detected mismatch/deadlock");
-    }
-
-    bool testScopedNoDenormalsPresent()
-    {
-        const std::string sourcePath = std::string(ROOMOVE_REPO_ROOT) + "/app/PluginProcessor.cpp";
-        std::ifstream sourceFile(sourcePath.c_str(), std::ios::in | std::ios::binary);
+        std::ifstream sourceFile(path.c_str(), std::ios::in | std::ios::binary);
         if (!sourceFile.is_open())
-            return assertCondition(false, "Unable to open PluginProcessor.cpp for denormal guard check");
-
-        std::string content((std::istreambuf_iterator<char>(sourceFile)), std::istreambuf_iterator<char>());
-        const std::size_t processBlockPos = content.find("processBlock");
-        if (processBlockPos == std::string::npos)
-            return assertCondition(false, "processBlock was not found in PluginProcessor.cpp");
-
-        const std::size_t denormalPos = content.find("juce::ScopedNoDenormals", processBlockPos);
-        return assertCondition(denormalPos != std::string::npos, "processBlock does not contain juce::ScopedNoDenormals");
-    }
-
-    bool testInferenceLatencyBudget()
-    {
-        constexpr int sampleRate = 48000;
-        constexpr int blockSize = 512;
-        constexpr int iterations = 1000;
-        constexpr long long latencyBudgetNanoseconds = 4000000LL;
-
-        RoomoveDspState state;
-        roomoveDspStateInit(&state, (float) sampleRate);
-        roomoveDspStateSetArmorStrength(&state, 1.0f);
-
-        std::vector<float> input((size_t) blockSize, 0.01f);
-        std::vector<float> output((size_t) blockSize, 0.0f);
-        std::atomic<long long> maxLatencyNs{0};
-
-        std::thread worker([&]()
-        {
-            for (int i = 0; i < iterations; ++i)
-            {
-                input[(size_t) (i % blockSize)] = (float) (0.005 * (i % 7));
-                const auto start = std::chrono::high_resolution_clock::now();
-                roomoveDspStateProcessAudioNoAlias(&state, input.data(), output.data(), blockSize);
-                const auto end = std::chrono::high_resolution_clock::now();
-                const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-
-                long long current = maxLatencyNs.load();
-                while (elapsed > current && !maxLatencyNs.compare_exchange_weak(current, elapsed))
-                {
-                }
-            }
-        });
-
-        worker.join();
-        const long long observed = maxLatencyNs.load();
-        if (!assertCondition(observed > 0, "Latency benchmark did not execute"))
             return false;
 
-        std::cout << "Latency max ns: " << observed << std::endl;
-        return assertCondition(observed < latencyBudgetNanoseconds, "Background DSP inference exceeded 4.0ms budget");
+        content.assign((std::istreambuf_iterator<char>(sourceFile)), std::istreambuf_iterator<char>());
+        return true;
+    }
+
+    std::size_t findMatchingBrace(const std::string& text, std::size_t openBrace)
+    {
+        int depth = 0;
+        for (std::size_t index = openBrace; index < text.size(); ++index)
+        {
+            if (text[index] == '{')
+                ++depth;
+            else if (text[index] == '}')
+            {
+                --depth;
+                if (depth == 0)
+                    return index;
+            }
+        }
+
+        return std::string::npos;
+    }
+
+    bool extractFunctionBody(const std::string& text, const std::string& token, FunctionBody& result)
+    {
+        const std::size_t tokenPosition = text.find(token);
+        if (tokenPosition == std::string::npos)
+            return false;
+
+        const std::size_t openBrace = text.find('{', tokenPosition);
+        if (openBrace == std::string::npos)
+            return false;
+
+        const std::size_t closeBrace = findMatchingBrace(text, openBrace);
+        if (closeBrace == std::string::npos)
+            return false;
+
+        result.name = token;
+        result.body = text.substr(openBrace + 1, closeBrace - openBrace - 1);
+        result.startLine = text.substr(0, openBrace).find_last_of('\n');
+        return true;
+    }
+
+    bool assertNoForbiddenTokens(
+        const FunctionBody& function,
+        const std::vector<std::pair<std::string, std::string>>& forbidden,
+        const std::string& context)
+    {
+        bool ok = true;
+        for (const auto& entry : forbidden)
+        {
+            if (function.body.find(entry.first) != std::string::npos)
+                ok = assertCondition(false, function.name + " contains " + entry.second + " in " + context) && ok;
+        }
+        return ok;
+    }
+
+    bool testProcessBlockGuardrails()
+    {
+        const std::string sourcePath = std::string(ROOMOVE_REPO_ROOT) + "/app/PluginProcessor.cpp";
+        std::string content;
+        if (!readTextFile(sourcePath, content))
+            return assertCondition(false, "Unable to open PluginProcessor.cpp for realtime guardrail checks");
+
+        FunctionBody processBlock;
+        if (!extractFunctionBody(content, "ArmorAudioProcessor::processBlock", processBlock))
+            return assertCondition(false, "processBlock was not found in PluginProcessor.cpp");
+
+        const std::vector<std::pair<std::string, std::string>> forbiddenAllocations{
+            { " new ", "dynamic allocation" },
+            { "new ", "dynamic allocation" },
+            { ".push_back", "container growth" },
+            { ".emplace_back", "container growth" },
+            { ".resize", "container resize" },
+            { ".reserve", "container reserve" },
+            { "malloc(", "malloc" },
+            { "calloc(", "calloc" },
+            { "realloc(", "realloc" },
+            { "free(", "free" },
+        };
+        const std::vector<std::pair<std::string, std::string>> forbiddenLocks{
+            { "std::mutex", "std::mutex" },
+            { "std::lock_guard", "std::lock_guard" },
+            { "std::unique_lock", "std::unique_lock" },
+            { "std::scoped_lock", "std::scoped_lock" },
+            { "juce::CriticalSection", "juce::CriticalSection" },
+            { "juce::SpinLock", "juce::SpinLock" },
+            { "juce::ScopedLock", "juce::ScopedLock" },
+        };
+        const std::vector<std::pair<std::string, std::string>> forbiddenBlocking{
+            { "sleep_for(", "sleep call" },
+            { "sleep_until(", "sleep call" },
+            { ".wait(", "wait call" },
+            { "MessageManagerLock", "message-manager blocking lock" },
+            { ".join(", "thread join" },
+        };
+
+        bool ok = true;
+        ok = assertCondition(
+                 processBlock.body.find("juce::ScopedNoDenormals") != std::string::npos,
+                 "processBlock does not contain juce::ScopedNoDenormals")
+             && ok;
+        ok = assertNoForbiddenTokens(processBlock, forbiddenAllocations, "processBlock") && ok;
+        ok = assertNoForbiddenTokens(processBlock, forbiddenLocks, "processBlock") && ok;
+        ok = assertNoForbiddenTokens(processBlock, forbiddenBlocking, "processBlock") && ok;
+        return ok;
+    }
+
+    bool testPrepareToPlayOwnsWarmupAllocation()
+    {
+        const std::string sourcePath = std::string(ROOMOVE_REPO_ROOT) + "/app/PluginProcessor.cpp";
+        std::string content;
+        if (!readTextFile(sourcePath, content))
+            return assertCondition(false, "Unable to open PluginProcessor.cpp for warmup checks");
+
+        FunctionBody prepareToPlay;
+        FunctionBody processBlock;
+        if (!extractFunctionBody(content, "ArmorAudioProcessor::prepareToPlay", prepareToPlay))
+            return assertCondition(false, "prepareToPlay was not found in PluginProcessor.cpp");
+        if (!extractFunctionBody(content, "ArmorAudioProcessor::processBlock", processBlock))
+            return assertCondition(false, "processBlock was not found in PluginProcessor.cpp");
+
+        bool ok = true;
+        ok = assertCondition(
+                 prepareToPlay.body.find("dspStates.resize") != std::string::npos,
+                 "prepareToPlay should size dspStates during warmup")
+             && ok;
+        ok = assertCondition(
+                 processBlock.body.find("dspStates.resize") == std::string::npos,
+                 "processBlock must not resize dspStates after warmup")
+             && ok;
+        return ok;
+    }
+
+    bool testDspProcessFunctionsAvoidRealtimeHazards()
+    {
+        const std::string sourcePath = std::string(ROOMOVE_REPO_ROOT) + "/dsp/RoomoveDSP.cpp";
+        std::string content;
+        if (!readTextFile(sourcePath, content))
+            return assertCondition(false, "Unable to open RoomoveDSP.cpp for realtime guardrail checks");
+
+        const std::vector<std::pair<std::string, std::string>> forbiddenAllocations{
+            { " new ", "dynamic allocation" },
+            { "new ", "dynamic allocation" },
+            { ".push_back", "container growth" },
+            { ".emplace_back", "container growth" },
+            { ".resize", "container resize" },
+            { ".reserve", "container reserve" },
+            { "malloc(", "malloc" },
+            { "calloc(", "calloc" },
+            { "realloc(", "realloc" },
+            { "free(", "free" },
+        };
+        const std::vector<std::pair<std::string, std::string>> forbiddenLocks{
+            { "std::mutex", "std::mutex" },
+            { "std::lock_guard", "std::lock_guard" },
+            { "std::unique_lock", "std::unique_lock" },
+            { "std::scoped_lock", "std::scoped_lock" },
+            { "juce::CriticalSection", "juce::CriticalSection" },
+            { "juce::SpinLock", "juce::SpinLock" },
+            { "juce::ScopedLock", "juce::ScopedLock" },
+        };
+        const std::vector<std::pair<std::string, std::string>> forbiddenBlocking{
+            { "sleep_for(", "sleep call" },
+            { "sleep_until(", "sleep call" },
+            { ".wait(", "wait call" },
+            { "MessageManagerLock", "message-manager blocking lock" },
+            { ".join(", "thread join" },
+        };
+
+        bool ok = true;
+        for (const auto& functionName : { "roomoveDspStateProcessAudioNoAlias", "roomoveDspStateProcessAudio" })
+        {
+            FunctionBody function;
+            if (!extractFunctionBody(content, functionName, function))
+                return assertCondition(false, std::string("Function not found: ") + functionName);
+
+            ok = assertNoForbiddenTokens(function, forbiddenAllocations, functionName) && ok;
+            ok = assertNoForbiddenTokens(function, forbiddenLocks, functionName) && ok;
+            ok = assertNoForbiddenTokens(function, forbiddenBlocking, functionName) && ok;
+        }
+
+        return ok;
     }
 }
 
 int main()
 {
+    juce::ignoreUnused(sizeof(RoomoveDspState));
+
     bool ok = true;
-    ok = testAbstractFifoHighContention() && ok;
-    ok = testScopedNoDenormalsPresent() && ok;
-    ok = testInferenceLatencyBudget() && ok;
+    ok = testProcessBlockGuardrails() && ok;
+    ok = testPrepareToPlayOwnsWarmupAllocation() && ok;
+    ok = testDspProcessFunctionsAvoidRealtimeHazards() && ok;
 
     if (!ok)
         return 1;

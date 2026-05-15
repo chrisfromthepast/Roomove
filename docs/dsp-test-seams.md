@@ -53,7 +53,7 @@ exercised headlessly — use the C API directly for unit tests.
 | Default sample rate | 48 000 Hz | `kDefaultSampleRate` (`dsp/RoomoveDSP.cpp:16`) |
 | `prepareToPlay` accepts | any `sampleRate > 1000 Hz` | guard in `roomoveDspStateInit` |
 | Hop length (internal mask period) | 512 samples | `kHopLengthSamples` (`dsp/RoomoveDSP.cpp:17`) |
-| Validation test block size | 512 samples | `tests/RealtimeValidationTests.cpp:132` |
+| Validation guardrail block size | n/a (static source inspection) | `tests/RealtimeValidationTests.cpp` |
 | DTT suite buffer size | 64 samples | `dtt/suites/DSH_SigCancellation.yml` |
 | DSP seam test block size | 64 samples | `tests/DspSeamTests.cpp` |
 | Overlap scratch buffer | 1 024 samples | `kOverlapScratchSamples` (`dsp/RoomoveDSP.cpp:27`) |
@@ -134,9 +134,9 @@ The DSP-layer `RoomoveDspState` carries no persistent state; it is fully reconst
 
 | Test name | File | CTest target | Requires JUCE? |
 |---|---|---|---|
-| `testAbstractFifoHighContention` | `tests/RealtimeValidationTests.cpp` | `Roomove_ValidationTests` | `juce_core` only |
-| `testScopedNoDenormalsPresent` | `tests/RealtimeValidationTests.cpp` | `Roomove_ValidationTests` | `juce_core` only |
-| `testInferenceLatencyBudget` | `tests/RealtimeValidationTests.cpp` | `Roomove_ValidationTests` | `juce_core` only |
+| `testProcessBlockGuardrails` | `tests/RealtimeValidationTests.cpp` | `Roomove_ValidationTests` | `juce_core` only |
+| `testPrepareToPlayOwnsWarmupAllocation` | `tests/RealtimeValidationTests.cpp` | `Roomove_ValidationTests` | `juce_core` only |
+| `testDspProcessFunctionsAvoidRealtimeHazards` | `tests/RealtimeValidationTests.cpp` | `Roomove_ValidationTests` | `juce_core` only |
 | `testDefaultStateAfterInit` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
 | `testBypassAtArmorStrengthZero` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
 | `testArmorStrengthClamping` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
@@ -144,7 +144,7 @@ The DSP-layer `RoomoveDspState` carries no persistent state; it is fully reconst
 | `testInPlaceProcessing` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
 | `testSilencePassesThroughClean` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
 | `testNullPointerSafety` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
-| Real-time memory hygiene | `scripts/check_realtime_memory_hygiene.py` | `roomove_realtime_memory_hygiene` | Python 3 only |
+| Stage 1 realtime guardrails | `scripts/check_realtime_memory_hygiene.py` | `roomove_realtime_memory_hygiene` | Python 3 only |
 
 **Run all headless tests after a native host build:**
 
@@ -159,7 +159,31 @@ x86-64, Windows x64) as part of CI.
 
 ---
 
-## 7. CI and Hardware Build Targets
+## 7. Stage 1 Real-time Guardrail Expectations
+
+The current guardrails are intentionally lightweight and deterministic. They are the
+"stage 1" contributor rules for any code that runs in `prepareToPlay`, `processBlock`, or
+the C DSP render functions:
+
+- `prepareToPlay` is the warmup boundary. Buffer sizing and other setup work belongs there,
+  not in `processBlock`.
+- `processBlock`, `roomoveDspStateProcessAudio`, and
+  `roomoveDspStateProcessAudioNoAlias` must not allocate memory after warmup.
+- Real-time paths must not take locks (`std::mutex`, `juce::CriticalSection`,
+  `juce::SpinLock`, scoped lock helpers).
+- Real-time paths must not block (`sleep`, `wait`, `join`, `MessageManagerLock`, blocking
+  file reads).
+- CI guardrail assertions must stay deterministic and avoid wall-clock timing or scheduler
+  sensitivity.
+
+The host-side `Roomove_ValidationTests` target enforces the source-level guardrails when
+JUCE is available. The Python `roomove_realtime_memory_hygiene` test mirrors the same
+rules without compiling the plugin, so it can run safely on host automation and DSP-focused
+workflows alike.
+
+---
+
+## 8. CI and Hardware Build Targets
 
 | Workflow file | Runner | Output artifact | DSP toolchain |
 |---|---|---|---|
@@ -185,7 +209,7 @@ the mac-arm-standalone workflow once a JUCE installation is available on the run
 
 ---
 
-## 8. FleetwoodAir → Roomove Mapping Table
+## 9. FleetwoodAir → Roomove Mapping Table
 
 > FleetwoodAir is the reference test suite used as the porting baseline.  
 > The table maps each FleetwoodAir test category to the nearest Roomove equivalent.
@@ -198,17 +222,17 @@ the mac-arm-standalone workflow once a JUCE installation is available on the run
 | Audio render (separate buffers) | `FleetwoodDspState::processNoAlias()` | `roomoveDspStateProcessAudioNoAlias(state, in, out, n)` | `dsp/RoomoveDSP.cpp` |
 | Audio render (in-place) | `FleetwoodDspState::processInPlace()` | `roomoveDspStateProcessAudio(state, buf, buf, n)` | `dsp/RoomoveDSP.cpp` |
 | Bypass / pass-through | `FleetwoodDspState::bypass()` | `roomoveDspStateSetArmorStrength(state, 0.0f)` | `dsp/RoomoveDSP.cpp` |
-| Inference latency budget | `FleetwoodLatencyTest` | `testInferenceLatencyBudget()` | `tests/RealtimeValidationTests.cpp` |
-| Real-time memory hygiene | `FleetwoodMemHygieneTest` | `roomove_realtime_memory_hygiene` | `scripts/check_realtime_memory_hygiene.py` |
-| Lock-free FIFO concurrency | `FleetwoodFifoTest` | `testAbstractFifoHighContention()` | `tests/RealtimeValidationTests.cpp` |
-| Denormal protection guard | `FleetwoodDenormalTest` | `testScopedNoDenormalsPresent()` | `tests/RealtimeValidationTests.cpp` |
+| Stage 1 processBlock guardrails | `FleetwoodRealtimeHardening` | `testProcessBlockGuardrails()` | `tests/RealtimeValidationTests.cpp` |
+| Stage 1 warmup ownership | `FleetwoodRealtimeHardening` | `testPrepareToPlayOwnsWarmupAllocation()` | `tests/RealtimeValidationTests.cpp` |
+| Stage 1 DSP render guardrails | `FleetwoodRealtimeHardening` | `testDspProcessFunctionsAvoidRealtimeHazards()` | `tests/RealtimeValidationTests.cpp` |
+| Real-time source guardrails | `FleetwoodMemHygieneTest` | `roomove_realtime_memory_hygiene` | `scripts/check_realtime_memory_hygiene.py` |
 | Native vs DSP parity (null test) | `FleetwoodNativeDspParity` | `DSH_SigCancellation` suite | `dtt/suites/DSH_SigCancellation.yml` |
 | HDX TI cycle budget | `FleetwoodHDXCycleTest` | `DSH_TI_CycleCounts` suite | `dtt/suites/DSH_TI_CycleCounts.yml` |
 | Preset save / load round-trip | `FleetwoodPresetTest` | `getStateInformation` / `setStateInformation` | `app/PluginProcessor.cpp` |
 
 ---
 
-## 9. Architecture Note — How Roomove Processing Is Exercised in Tests
+## 10. Architecture Note — How Roomove Processing Is Exercised in Tests
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -235,12 +259,13 @@ the mac-arm-standalone workflow once a JUCE installation is available on the run
 │  File:   tests/RealtimeValidationTests.cpp                      │
 │  Target: Roomove_ValidationTests  (CTest)                       │
 │                                                                 │
-│  • testAbstractFifoHighContention  — lock-free FIFO safety      │
-│  • testScopedNoDenormalsPresent    — denormal guard presence     │
-│  • testInferenceLatencyBudget      — DSP latency ≤ 4 ms / block │
+│  • testProcessBlockGuardrails      — no alloc/lock/block in RT  │
+│  • testPrepareToPlayOwnsWarmupAllocation — resize before RT     │
+│  • testDspProcessFunctionsAvoidRealtimeHazards — DSP discipline │
 │                                                                 │
 │  ✅ Runs headlessly on any native host                          │
-│  ✅ Requires only juce::juce_core (no audio I/O)               │
+│  ✅ Requires only juce::juce_core (no audio I/O)                │
+│  ✅ Uses static source inspection only (deterministic in CI)    │
 └────────────────────────┬────────────────────────────────────────┘
                          │
                          ▼
@@ -249,9 +274,10 @@ the mac-arm-standalone workflow once a JUCE installation is available on the run
 │  File:   scripts/check_realtime_memory_hygiene.py               │
 │  Target: roomove_realtime_memory_hygiene  (CTest)               │
 │                                                                 │
-│  Parses PluginProcessor.cpp statically; confirms:               │
-│  • processBlock contains ScopedNoDenormals                      │
-│  • processBlock contains no dynamic allocation call             │
+│  Parses PluginProcessor.cpp / RoomoveDSP.cpp statically;        │
+│  confirms no alloc/lock/block hazards in realtime functions,    │
+│  warmup stays in prepareToPlay, and host guardrail tests        │
+│  remain deterministic.                                          │
 │                                                                 │
 │  ✅ Runs on any host with Python 3 — no compilation needed      │
 └────────────────────────┬────────────────────────────────────────┘

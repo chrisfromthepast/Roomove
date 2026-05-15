@@ -322,7 +322,7 @@ else()
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_realtime_memory_hygiene.py"
                 --plugin-processor "${CMAKE_CURRENT_SOURCE_DIR}/app/PluginProcessor.cpp"
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-            COMMENT "Running real-time memory hygiene scan"
+            COMMENT "Running stage 1 real-time guardrail scan"
         )
         add_test(
             NAME roomove_realtime_memory_hygiene
