@@ -311,8 +311,9 @@ namespace
         for (int i = 0; i < n; ++i)
         {
             if (!assertCondition (floatNear (overlapBuffer[i], referenceOutput[i], 1.0e-5f),
-                                  "partial-overlap mismatch: overlapBuffer[i] vs referenceOutput[i] at sample "
-                                      + std::to_string (i)))
+                                  "partial-overlap mismatch at sample " + std::to_string (i)
+                                      + ": overlap=" + std::to_string (overlapBuffer[i])
+                                      + " reference=" + std::to_string (referenceOutput[i])))
                 return false;
         }
 
@@ -405,7 +406,10 @@ namespace
         for (int i = 0; i < n; ++i)
         {
             if (!assertCondition (floatNear (singleSampleOutput[i], fullBlockOutput[i], 1.0e-6f),
-                                  "single-sample determinism mismatch at sample " + std::to_string (i)))
+                                  "single-sample determinism mismatch at sample " + std::to_string (i)
+                                      + ": single=" + std::to_string (singleSampleOutput[i])
+                                      + " full=" + std::to_string (fullBlockOutput[i])
+                                      + " delta=" + std::to_string (singleSampleOutput[i] - fullBlockOutput[i])))
                 return false;
         }
 
