@@ -107,7 +107,6 @@ jobs:
       # ------------------------------------------------------------------
       # 5. RUN TEST SUITE
       # Supports optional -R (name filter) and -L (label/category filter).
-      # --label-summary prints a per-category pass/fail table for readability.
       # JUnit XML is written to test-results.xml for artifact upload.
       # ------------------------------------------------------------------
       - name: Run Test Suite
