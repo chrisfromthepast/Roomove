@@ -298,11 +298,13 @@ namespace
         roomoveDspStateSetArmorStrength (&referenceState, 1.0f);
 
         constexpr int n = 1536; // exercises the overlap chunking path with a large buffer
+        constexpr float kOverlapTestAmplitude = 0.75f;
+        constexpr float kOverlapTestPhaseStep = 0.01f;
         std::array<float, n + 1> overlapBuffer;
         std::array<float, n> referenceInput;
         std::array<float, n> referenceOutput;
         for (int i = 0; i < n + 1; ++i)
-            overlapBuffer[i] = 0.75f * std::sin (0.01f * (float) i);
+            overlapBuffer[i] = kOverlapTestAmplitude * std::sin (kOverlapTestPhaseStep * (float) i);
         for (int i = 0; i < n; ++i)
             referenceInput[i] = overlapBuffer[i + 1];
 
@@ -329,9 +331,10 @@ namespace
     bool testSignalStabilityInvariants()
     {
         RoomoveDspState state;
+        constexpr float kMaskFloor = 0.02f;
         roomoveDspStateInit (&state, 48000.0f);
         roomoveDspStateSetArmorStrength (&state, 1.0f);
-        roomoveDspStateSetMask (&state, 0.02f);
+        roomoveDspStateSetMask (&state, kMaskFloor);
 
         constexpr int n = 2048;
         std::array<float, n> input;
@@ -366,7 +369,7 @@ namespace
                 return false;
         }
 
-        if (!assertCondition (std::isfinite (state.currentMask) && state.currentMask >= 0.02f && state.currentMask <= 1.0f,
+        if (!assertCondition (std::isfinite (state.currentMask) && state.currentMask >= kMaskFloor && state.currentMask <= 1.0f,
                               "currentMask must remain finite and in [0.02, 1.0], got "
                                   + std::to_string (state.currentMask)))
             return false;
@@ -393,11 +396,16 @@ namespace
         roomoveDspStateSetArmorStrength (&singleSampleState, 1.0f);
 
         constexpr int n = 257;
+        constexpr float kPrimaryAmplitude = 0.4f;
+        constexpr float kPrimaryPhaseStep = 0.07f;
+        constexpr float kSecondaryAmplitude = 0.1f;
+        constexpr float kSecondaryPhaseStep = 0.11f;
         std::array<float, n> input;
         std::array<float, n> fullBlockOutput;
         std::array<float, n> singleSampleOutput;
         for (int i = 0; i < n; ++i)
-            input[i] = 0.4f * std::sin (0.07f * (float) i) + 0.1f * std::cos (0.11f * (float) i);
+            input[i] = (kPrimaryAmplitude * std::sin (kPrimaryPhaseStep * (float) i))
+                       + (kSecondaryAmplitude * std::cos (kSecondaryPhaseStep * (float) i));
 
         roomoveDspStateProcessAudio (&fullBlockState, input.data(), fullBlockOutput.data(), n);
 
