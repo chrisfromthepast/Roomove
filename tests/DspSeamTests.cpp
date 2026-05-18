@@ -311,7 +311,8 @@ namespace
         for (int i = 0; i < n; ++i)
         {
             if (!assertCondition (floatNear (overlapBuffer[i], referenceOutput[i], 1.0e-5f),
-                                  "partial-overlap mismatch at sample " + std::to_string (i)))
+                                  "partial-overlap mismatch: overlapBuffer[i] vs referenceOutput[i] at sample "
+                                      + std::to_string (i)))
                 return false;
         }
 
@@ -364,11 +365,13 @@ namespace
         }
 
         if (!assertCondition (std::isfinite (state.currentMask) && state.currentMask >= 0.02f && state.currentMask <= 1.0f,
-                              "currentMask must remain finite and in [0.02, 1.0]"))
+                              "currentMask must remain finite and in [0.02, 1.0], got "
+                                  + std::to_string (state.currentMask)))
             return false;
 
         if (!assertCondition (std::isfinite (state.peakEnvelope) && state.peakEnvelope >= 0.0f,
-                              "peakEnvelope must remain finite and non-negative"))
+                              "peakEnvelope must remain finite and non-negative, got "
+                                  + std::to_string (state.peakEnvelope)))
             return false;
 
         return true;
