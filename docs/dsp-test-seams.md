@@ -144,6 +144,14 @@ The DSP-layer `RoomoveDspState` carries no persistent state; it is fully reconst
 | `testInPlaceProcessing` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
 | `testSilencePassesThroughClean` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
 | `testNullPointerSafety` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
+| `testParameterDeclarationContracts` | `tests/ProcessorTests.cpp` | `Roomove_ProcessorTests` | `juce_core` only |
+| `testStateSerializationImplementation` | `tests/ProcessorTests.cpp` | `Roomove_ProcessorTests` | `juce_core` only |
+| `testPrepareToPlayInitializesAllStates` | `tests/ProcessorTests.cpp` | `Roomove_ProcessorTests` | `juce_core` only |
+| `testSingleProgramImplementation` | `tests/ProcessorTests.cpp` | `Roomove_ProcessorTests` | `juce_core` only |
+| `testBypassTransparencyAtMultipleSampleRates` | `tests/ProcessorTests.cpp` | `Roomove_ProcessorTests` | `juce_core` only |
+| `testStateInitResetCycle` | `tests/ProcessorTests.cpp` | `Roomove_ProcessorTests` | `juce_core` only |
+| `testBypassAfterStateReset` | `tests/ProcessorTests.cpp` | `Roomove_ProcessorTests` | `juce_core` only |
+| `testBlockSizeVariation` | `tests/ProcessorTests.cpp` | `Roomove_ProcessorTests` | `juce_core` only |
 | Stage 1 realtime guardrails | `scripts/check_realtime_memory_hygiene.py` | `roomove_realtime_memory_hygiene` | Python 3 only |
 
 **Run all headless tests after a native host build:**
@@ -156,6 +164,16 @@ ctest --output-on-failure
 `Roomove_DspSeamTests` links only the DSP translation unit and standard C++ libraries — no
 JUCE, no audio driver, no plugin host. It can run on any native host (macOS arm64, Linux
 x86-64, Windows x64) as part of CI.
+
+`Roomove_ProcessorTests` (Phase 3) adds processor correctness and state round-trip
+validation via two complementary strategies:
+- **Source-inspection tests** parse `PluginProcessor.cpp` / `PluginProcessor.h` at
+  runtime to assert that parameter declarations, state serialization, and initialisation
+  patterns match the documented contracts.  These tests require only `juce_core` for file
+  I/O and are deterministic in CI without a display or audio driver.
+- **DSP-layer behavioural tests** drive `RoomoveDspState` directly to verify neutral/bypass
+  transparency at multiple sample rates and to validate that the init → process → re-init
+  cycle (simulating a preset load followed by `prepareToPlay`) fully restores a clean state.
 
 ---
 
@@ -222,13 +240,20 @@ the mac-arm-standalone workflow once a JUCE installation is available on the run
 | Audio render (separate buffers) | `FleetwoodDspState::processNoAlias()` | `roomoveDspStateProcessAudioNoAlias(state, in, out, n)` | `dsp/RoomoveDSP.cpp` |
 | Audio render (in-place) | `FleetwoodDspState::processInPlace()` | `roomoveDspStateProcessAudio(state, buf, buf, n)` | `dsp/RoomoveDSP.cpp` |
 | Bypass / pass-through | `FleetwoodDspState::bypass()` | `roomoveDspStateSetArmorStrength(state, 0.0f)` | `dsp/RoomoveDSP.cpp` |
+| Parameter ID / name / range | `FleetwoodProcessorTests::paramContracts` | `testParameterDeclarationContracts()` | `tests/ProcessorTests.cpp` |
+| Preset save / load round-trip | `FleetwoodPresetTest` | `testStateSerializationImplementation()` | `tests/ProcessorTests.cpp` |
+| Processor init pattern | `FleetwoodProcessorTests::prepareToPlay` | `testPrepareToPlayInitializesAllStates()` | `tests/ProcessorTests.cpp` |
+| Single-program (no multi-preset) | `FleetwoodProcessorTests::numPrograms` | `testSingleProgramImplementation()` | `tests/ProcessorTests.cpp` |
+| Bypass at multiple sample rates | `FleetwoodAirTests::bypassMultiSR` | `testBypassTransparencyAtMultipleSampleRates()` | `tests/ProcessorTests.cpp` |
+| State reset round-trip | `FleetwoodAirTests::stateReset` | `testStateInitResetCycle()` | `tests/ProcessorTests.cpp` |
+| Bypass after reset | `FleetwoodAirTests::bypassAfterReset` | `testBypassAfterStateReset()` | `tests/ProcessorTests.cpp` |
+| Block size variation | `FleetwoodAirTests::blockSizeVariation` | `testBlockSizeVariation()` | `tests/ProcessorTests.cpp` |
 | Stage 1 processBlock guardrails | `FleetwoodRealtimeHardening` | `testProcessBlockGuardrails()` | `tests/RealtimeValidationTests.cpp` |
 | Stage 1 warmup ownership | `FleetwoodRealtimeHardening` | `testPrepareToPlayOwnsWarmupAllocation()` | `tests/RealtimeValidationTests.cpp` |
 | Stage 1 DSP render guardrails | `FleetwoodRealtimeHardening` | `testDspProcessFunctionsAvoidRealtimeHazards()` | `tests/RealtimeValidationTests.cpp` |
 | Real-time source guardrails | `FleetwoodMemHygieneTest` | `roomove_realtime_memory_hygiene` | `scripts/check_realtime_memory_hygiene.py` |
 | Native vs DSP parity (null test) | `FleetwoodNativeDspParity` | `DSH_SigCancellation` suite | `dtt/suites/DSH_SigCancellation.yml` |
 | HDX TI cycle budget | `FleetwoodHDXCycleTest` | `DSH_TI_CycleCounts` suite | `dtt/suites/DSH_TI_CycleCounts.yml` |
-| Preset save / load round-trip | `FleetwoodPresetTest` | `getStateInformation` / `setStateInformation` | `app/PluginProcessor.cpp` |
 
 ---
 
@@ -255,7 +280,26 @@ the mac-arm-standalone workflow once a JUCE installation is available on the run
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Test Layer 2 — Real-time validation (juce_core + C DSP)       │
+│  Test Layer 2 — Processor correctness (juce_core + C DSP)      │
+│  File:   tests/ProcessorTests.cpp                               │
+│  Target: Roomove_ProcessorTests  (CTest)               [Ph. 3] │
+│                                                                 │
+│  (a) Source-inspection: parses PluginProcessor.cpp/.h to assert │
+│      parameter ID / name / default / range contracts, the APVTS │
+│      state serialization round-trip pattern, prepareToPlay init │
+│      discipline, and single-program (no multi-preset) contract. │
+│  (b) DSP-layer behavioural: bypass transparency at 44.1, 48,   │
+│      88.2, and 96 kHz; init→process→re-init state reset cycle; │
+│      bypass correctness after reset; block size variation.      │
+│                                                                 │
+│  ✅ Runs headlessly on any native host                          │
+│  ✅ Requires only juce::juce_core (no audio I/O)                │
+│  ✅ Deterministic in CI — no wall-clock or scheduler dependency │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Test Layer 3 — Real-time validation (juce_core + C DSP)       │
 │  File:   tests/RealtimeValidationTests.cpp                      │
 │  Target: Roomove_ValidationTests  (CTest)                       │
 │                                                                 │
@@ -270,7 +314,7 @@ the mac-arm-standalone workflow once a JUCE installation is available on the run
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Test Layer 3 — Source hygiene (Python, no compilation needed) │
+│  Test Layer 4 — Source hygiene (Python, no compilation needed) │
 │  File:   scripts/check_realtime_memory_hygiene.py               │
 │  Target: roomove_realtime_memory_hygiene  (CTest)               │
 │                                                                 │
@@ -284,7 +328,7 @@ the mac-arm-standalone workflow once a JUCE installation is available on the run
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Test Layer 4 — DSH / AAX integration (hardware shell only)    │
+│  Test Layer 5 — DSH / AAX integration (hardware shell only)    │
 │  Files:  dtt/suites/DSH_SigCancellation.yml                     │
 │          dtt/suites/DSH_TI_CycleCounts.yml                      │
 │                                                                 │

@@ -301,6 +301,24 @@ else()
         )
         add_test(NAME Roomove_ValidationTests COMMAND Roomove_ValidationTests)
         set_tests_properties(Roomove_ValidationTests PROPERTIES LABELS "realtime")
+
+        add_executable(Roomove_ProcessorTests
+            tests/ProcessorTests.cpp
+            dsp/RoomoveDSP.cpp
+        )
+        target_include_directories(Roomove_ProcessorTests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/dsp
+            ${CMAKE_CURRENT_SOURCE_DIR}/app
+        )
+        target_link_libraries(Roomove_ProcessorTests PRIVATE
+            juce::juce_core
+        )
+        target_compile_definitions(Roomove_ProcessorTests PRIVATE
+            ROOMOVE_REPO_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+        add_test(NAME Roomove_ProcessorTests COMMAND Roomove_ProcessorTests)
+        set_tests_properties(Roomove_ProcessorTests PROPERTIES LABELS "processor")
     endif()
 
     if(ROOMOVE_ENABLE_VALIDATION_TESTS)
@@ -342,6 +360,9 @@ else()
         add_dependencies(roomove_all_tests Roomove_DspSeamTests)
         if(TARGET Roomove_ValidationTests)
             add_dependencies(roomove_all_tests Roomove_ValidationTests)
+        endif()
+        if(TARGET Roomove_ProcessorTests)
+            add_dependencies(roomove_all_tests Roomove_ProcessorTests)
         endif()
     endif()
 endif()
