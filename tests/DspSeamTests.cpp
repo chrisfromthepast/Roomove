@@ -5,6 +5,7 @@
 
 #include "RoomoveDSP.h"
 
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -296,17 +297,17 @@ namespace
         roomoveDspStateSetArmorStrength (&overlapState, 1.0f);
         roomoveDspStateSetArmorStrength (&referenceState, 1.0f);
 
-        const int n = 1536; // exercises chunking beyond kOverlapScratchSamples=1024
-        float overlapBuffer[n + 1];
-        float referenceInput[n];
-        float referenceOutput[n];
+        constexpr int n = 1536; // exercises the overlap chunking path with a large buffer
+        std::array<float, n + 1> overlapBuffer;
+        std::array<float, n> referenceInput;
+        std::array<float, n> referenceOutput;
         for (int i = 0; i < n + 1; ++i)
             overlapBuffer[i] = 0.75f * std::sin (0.01f * (float) i);
         for (int i = 0; i < n; ++i)
             referenceInput[i] = overlapBuffer[i + 1];
 
-        roomoveDspStateProcessAudio (&overlapState, overlapBuffer + 1, overlapBuffer, n);
-        roomoveDspStateProcessAudio (&referenceState, referenceInput, referenceOutput, n);
+        roomoveDspStateProcessAudio (&overlapState, overlapBuffer.data() + 1, overlapBuffer.data(), n);
+        roomoveDspStateProcessAudio (&referenceState, referenceInput.data(), referenceOutput.data(), n);
 
         for (int i = 0; i < n; ++i)
         {
@@ -332,9 +333,9 @@ namespace
         roomoveDspStateSetArmorStrength (&state, 1.0f);
         roomoveDspStateSetMask (&state, 0.02f);
 
-        const int n = 2048;
-        float input[n];
-        float output[n];
+        constexpr int n = 2048;
+        std::array<float, n> input;
+        std::array<float, n> output;
         for (int i = 0; i < n; ++i)
         {
             const int phase = i % 8;
@@ -356,7 +357,7 @@ namespace
                 input[i] = 0.25f * std::sin (0.015f * (float) i);
         }
 
-        roomoveDspStateProcessAudio (&state, input, output, n);
+        roomoveDspStateProcessAudio (&state, input.data(), output.data(), n);
 
         for (int i = 0; i < n; ++i)
         {
@@ -391,17 +392,17 @@ namespace
         roomoveDspStateSetArmorStrength (&fullBlockState, 1.0f);
         roomoveDspStateSetArmorStrength (&singleSampleState, 1.0f);
 
-        const int n = 257;
-        float input[n];
-        float fullBlockOutput[n];
-        float singleSampleOutput[n];
+        constexpr int n = 257;
+        std::array<float, n> input;
+        std::array<float, n> fullBlockOutput;
+        std::array<float, n> singleSampleOutput;
         for (int i = 0; i < n; ++i)
             input[i] = 0.4f * std::sin (0.07f * (float) i) + 0.1f * std::cos (0.11f * (float) i);
 
-        roomoveDspStateProcessAudio (&fullBlockState, input, fullBlockOutput, n);
+        roomoveDspStateProcessAudio (&fullBlockState, input.data(), fullBlockOutput.data(), n);
 
         for (int i = 0; i < n; ++i)
-            roomoveDspStateProcessAudio (&singleSampleState, input + i, singleSampleOutput + i, 1);
+            roomoveDspStateProcessAudio (&singleSampleState, input.data() + i, singleSampleOutput.data() + i, 1);
 
         for (int i = 0; i < n; ++i)
         {
