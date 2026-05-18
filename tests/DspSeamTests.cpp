@@ -410,7 +410,8 @@ namespace
                                   "single-sample determinism mismatch at sample " + std::to_string (i)
                                       + ": single=" + std::to_string (singleSampleOutput[i])
                                       + " full=" + std::to_string (fullBlockOutput[i])
-                                      + " delta=" + std::to_string (singleSampleOutput[i] - fullBlockOutput[i])))
+                                      + " abs_delta="
+                                      + std::to_string (std::fabs (singleSampleOutput[i] - fullBlockOutput[i]))))
                 return false;
         }
 
