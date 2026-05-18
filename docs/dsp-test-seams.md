@@ -144,6 +144,9 @@ The DSP-layer `RoomoveDspState` carries no persistent state; it is fully reconst
 | `testInPlaceProcessing` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
 | `testSilencePassesThroughClean` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
 | `testNullPointerSafety` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
+| `testPartialOverlapSafetyAtStressSize` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
+| `testSignalStabilityInvariants` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
+| `testSingleSampleBlockDeterminism` | `tests/DspSeamTests.cpp` | `Roomove_DspSeamTests` | None (pure C++) |
 | `testParameterDeclarationContracts` | `tests/ProcessorTests.cpp` | `Roomove_ProcessorTests` | `juce_core` only |
 | `testStateSerializationImplementation` | `tests/ProcessorTests.cpp` | `Roomove_ProcessorTests` | `juce_core` only |
 | `testPrepareToPlayInitializesAllStates` | `tests/ProcessorTests.cpp` | `Roomove_ProcessorTests` | `juce_core` only |
@@ -239,7 +242,10 @@ the mac-arm-standalone workflow once a JUCE installation is available on the run
 | Adaptive mask parameter | `FleetwoodDspState::setMask()` | `roomoveDspStateSetMask(state, v)` | `dsp/RoomoveDSP.cpp` |
 | Audio render (separate buffers) | `FleetwoodDspState::processNoAlias()` | `roomoveDspStateProcessAudioNoAlias(state, in, out, n)` | `dsp/RoomoveDSP.cpp` |
 | Audio render (in-place) | `FleetwoodDspState::processInPlace()` | `roomoveDspStateProcessAudio(state, buf, buf, n)` | `dsp/RoomoveDSP.cpp` |
+| Audio render (partial overlap) | overlap-safe dispatcher tests | `testPartialOverlapSafetyAtStressSize()` | `tests/DspSeamTests.cpp` |
 | Bypass / pass-through | `FleetwoodDspState::bypass()` | `roomoveDspStateSetArmorStrength(state, 0.0f)` | `dsp/RoomoveDSP.cpp` |
+| Signal stability invariants | finite output / bounded adaptive state | `testSignalStabilityInvariants()` | `tests/DspSeamTests.cpp` |
+| Low-buffer stress determinism | 1-sample block equivalence | `testSingleSampleBlockDeterminism()` | `tests/DspSeamTests.cpp` |
 | Parameter ID / name / range | `FleetwoodProcessorTests::paramContracts` | `testParameterDeclarationContracts()` | `tests/ProcessorTests.cpp` |
 | Preset save / load round-trip | `FleetwoodPresetTest` | `testStateSerializationImplementation()` | `tests/ProcessorTests.cpp` |
 | Processor init pattern | `FleetwoodProcessorTests::prepareToPlay` | `testPrepareToPlayInitializesAllStates()` | `tests/ProcessorTests.cpp` |

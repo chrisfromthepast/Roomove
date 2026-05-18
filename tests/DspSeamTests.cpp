@@ -5,6 +5,7 @@
 
 #include "RoomoveDSP.h"
 
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -282,6 +283,148 @@ namespace
 
         return assertCondition (true, "null pointer safety");
     }
+
+    // -------------------------------------------------------------------------
+    // Seam 8: partial-overlap safety at stress-size buffers
+    // The public process dispatcher must preserve sample order for overlapping
+    // ranges by chunking through the scratch path.
+    // -------------------------------------------------------------------------
+    bool testPartialOverlapSafetyAtStressSize()
+    {
+        RoomoveDspState overlapState, referenceState;
+        roomoveDspStateInit (&overlapState, 48000.0f);
+        roomoveDspStateInit (&referenceState, 48000.0f);
+        roomoveDspStateSetArmorStrength (&overlapState, 1.0f);
+        roomoveDspStateSetArmorStrength (&referenceState, 1.0f);
+
+        constexpr int n = 1536; // exercises the overlap chunking path with a large buffer
+        constexpr float kOverlapTestAmplitude = 0.75f;
+        constexpr float kOverlapTestPhaseStep = 0.01f;
+        std::array<float, n + 1> overlapBuffer;
+        std::array<float, n> referenceInput;
+        std::array<float, n> referenceOutput;
+        for (int i = 0; i < n + 1; ++i)
+            overlapBuffer[i] = kOverlapTestAmplitude * std::sin (kOverlapTestPhaseStep * (float) i);
+        for (int i = 0; i < n; ++i)
+            referenceInput[i] = overlapBuffer[i + 1];
+
+        roomoveDspStateProcessAudio (&overlapState, overlapBuffer.data() + 1, overlapBuffer.data(), n);
+        roomoveDspStateProcessAudio (&referenceState, referenceInput.data(), referenceOutput.data(), n);
+
+        for (int i = 0; i < n; ++i)
+        {
+            if (!assertCondition (floatNear (overlapBuffer[i], referenceOutput[i], 1.0e-5f),
+                                  "partial-overlap mismatch at sample " + std::to_string (i)
+                                      + ": overlap=" + std::to_string (overlapBuffer[i])
+                                      + " reference=" + std::to_string (referenceOutput[i])))
+                return false;
+        }
+
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Seam 9: signal stability invariants
+    // Processed samples and adaptive state fields should remain finite and
+    // bounded across mixed-amplitude input.
+    // -------------------------------------------------------------------------
+    bool testSignalStabilityInvariants()
+    {
+        RoomoveDspState state;
+        constexpr float kMaskFloor = 0.02f;
+        roomoveDspStateInit (&state, 48000.0f);
+        roomoveDspStateSetArmorStrength (&state, 1.0f);
+        roomoveDspStateSetMask (&state, kMaskFloor);
+
+        constexpr int n = 2048;
+        std::array<float, n> input;
+        std::array<float, n> output;
+        for (int i = 0; i < n; ++i)
+        {
+            const int phase = i % 8;
+            if (phase == 0)
+                input[i] = 0.0f;
+            else if (phase == 1)
+                input[i] = 1.0e-12f;
+            else if (phase == 2)
+                input[i] = -1.0e-12f;
+            else if (phase == 3)
+                input[i] = 0.75f;
+            else if (phase == 4)
+                input[i] = -0.75f;
+            else if (phase == 5)
+                input[i] = 1000.0f;
+            else if (phase == 6)
+                input[i] = -1000.0f;
+            else
+                input[i] = 0.25f * std::sin (0.015f * (float) i);
+        }
+
+        roomoveDspStateProcessAudio (&state, input.data(), output.data(), n);
+
+        for (int i = 0; i < n; ++i)
+        {
+            if (!assertCondition (std::isfinite (output[i]),
+                                  "non-finite output at sample " + std::to_string (i)))
+                return false;
+        }
+
+        if (!assertCondition (std::isfinite (state.currentMask) && state.currentMask >= kMaskFloor && state.currentMask <= 1.0f,
+                              "currentMask must remain finite and in [0.02, 1.0], got "
+                                  + std::to_string (state.currentMask)))
+            return false;
+
+        if (!assertCondition (std::isfinite (state.peakEnvelope) && state.peakEnvelope >= 0.0f,
+                              "peakEnvelope must remain finite and non-negative, got "
+                                  + std::to_string (state.peakEnvelope)))
+            return false;
+
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Seam 10: low-buffer stress determinism
+    // Processing the same stream one sample at a time must match full-block
+    // processing when sample order is identical.
+    // -------------------------------------------------------------------------
+    bool testSingleSampleBlockDeterminism()
+    {
+        RoomoveDspState fullBlockState, singleSampleState;
+        roomoveDspStateInit (&fullBlockState, 48000.0f);
+        roomoveDspStateInit (&singleSampleState, 48000.0f);
+        roomoveDspStateSetArmorStrength (&fullBlockState, 1.0f);
+        roomoveDspStateSetArmorStrength (&singleSampleState, 1.0f);
+
+        constexpr int n = 257;
+        constexpr float kPrimaryAmplitude = 0.4f;
+        constexpr float kPrimaryPhaseStep = 0.07f;
+        constexpr float kSecondaryAmplitude = 0.1f;
+        constexpr float kSecondaryPhaseStep = 0.11f;
+        std::array<float, n> input;
+        std::array<float, n> fullBlockOutput;
+        std::array<float, n> singleSampleOutput;
+        for (int i = 0; i < n; ++i)
+            input[i] = (kPrimaryAmplitude * std::sin (kPrimaryPhaseStep * (float) i))
+                       + (kSecondaryAmplitude * std::cos (kSecondaryPhaseStep * (float) i));
+
+        roomoveDspStateProcessAudio (&fullBlockState, input.data(), fullBlockOutput.data(), n);
+
+        for (int i = 0; i < n; ++i)
+            roomoveDspStateProcessAudio (&singleSampleState, input.data() + i, singleSampleOutput.data() + i, 1);
+
+        for (int i = 0; i < n; ++i)
+        {
+            if (!assertCondition (floatNear (singleSampleOutput[i], fullBlockOutput[i], 1.0e-6f),
+                                  "single-sample determinism mismatch at sample " + std::to_string (i)
+                                      + ": single=" + std::to_string (singleSampleOutput[i])
+                                      + " full=" + std::to_string (fullBlockOutput[i])
+                                      + " abs_delta="
+                                      + std::to_string (std::fabs (singleSampleOutput[i] - fullBlockOutput[i]))))
+                return false;
+        }
+
+        return true;
+    }
 }
 
 int main()
@@ -294,6 +437,9 @@ int main()
     ok &= testInPlaceProcessing();
     ok &= testSilencePassesThroughClean();
     ok &= testNullPointerSafety();
+    ok &= testPartialOverlapSafetyAtStressSize();
+    ok &= testSignalStabilityInvariants();
+    ok &= testSingleSampleBlockDeterminism();
 
     if (!ok)
         return 1;
